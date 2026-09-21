@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────────
+# pi-configurator .gitignore
+# Script bash + PowerShell, niente build artifacts.
+# ─────────────────────────────────────────────────────────────────
+
+# OS / file manager
+.DS_Store                  # macOS Finder
+._*                        # macOS resource forks (AppleDouble)
+.Spotlight-V100            # macOS Spotlight
+.Trashes                   # macOS trash
+Thumbs.db                  # Windows thumbnails
+desktop.ini                # Windows folder settings
+ehthumbs.db                # Windows legacy thumbs
+ehthumbs_vista.db
+$RECYCLE.BIN/              # Windows recycle bin
+
+# Editor / IDE
+.vscode/                   # VSCode user settings (per-user, non condivisi)
+.idea/                     # JetBrains
+*.swp                      # Vim swap
+*.swo
+*.swn
+*~
+.\#*                      # Emacs lock files
+\#*\#                     # Emacs autosave
+
+# Backup / temp
+*.bak
+*.tmp
+*.orig                     # merge originals
+*.rej                      # merge rejects
+
+# Test / build artifacts (se aggiungi test in futuro)
+*.log
+logs/
+coverage/
+tmp/
+test-output/
+*.out
+
+# Secrets & local config
+# Lo script non salva segreti nel progetto, ma se aggiungi un .env per
+# testare in locale evita commit accidentali.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.secret
+*credentials*
+
+# PowerShell
+*.ps1.xml                  # script signing metadata
+
+# Shell history (se esegui script dalla repo)
+.history
+.bash_history_local
