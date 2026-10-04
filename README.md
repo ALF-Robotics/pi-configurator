@@ -1,7 +1,23 @@
 # pi-configurator
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![EULA](https://img.shields.io/badge/EULA-v1.1-informational.svg)](EULA.md)
+<!--
+  Badge statici con valori verificati: i badge dinamici `github/...` di
+  shields.io NON funzionano su questo repo perché è privato — restituiscono
+  200 ma con immagine "repo not found".
+  Volutamente assenti:
+  - star      : non esiste un badge stars che legga un repo privato
+  - versione  : il repo non ha ancora tag, quindi non c'è una versione vera
+  - test      : la suite gira solo se qualcuno la lancia, non in CI
+-->
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
+[![EULA](https://img.shields.io/badge/EULA-v1.1-informational)](EULA.md)
+[![type](https://img.shields.io/badge/type-utility-blueviolet)](#cosa-fa)
+[![target](https://img.shields.io/badge/target-pi%20%28pi--coding--agent%29-ff69d4)](https://pi.dev/)
+[![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#file)
+[![languages](https://img.shields.io/badge/languages-Shell%20%2B%20PowerShell-89e051)](#file)
+[![bash](https://img.shields.io/badge/bash-3.2%2B-4EAA25)](pi-conf.sh)
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%20%7C%207%2B-012456)](pi-conf.ps1)
+[![dep](https://img.shields.io/badge/dep-jq-c0c0c0)](#dipendenze)
 
 Script interattivi per creare/aggiornare **profili provider custom** di
 [pi-code](https://pi.dev/) (CLI: `@mariozechner/pi-coding-agent`).
