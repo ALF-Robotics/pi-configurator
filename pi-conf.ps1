@@ -164,6 +164,79 @@ function Get-SanitizedName {
     return $trimmed
 }
 
+function Merge-Model {
+    # Un modello esistente viene aggiornato campo per campo. Il `cost` viene
+    # mantenuto: lo script scrive sempre zero, che azzererebbero un prezzo
+    # configurato a mano.
+    param($Old, $New)
+    $res = [ordered]@{}
+    foreach ($p in $Old.PSObject.Properties) { $res[$p.Name] = $p.Value }
+    foreach ($k in $New.Keys)             { $res[$k] = $New[$k] }
+    if ($Old.PSObject.Properties.Name -contains 'cost') { $res['cost'] = $Old.cost }
+    return ($res | ConvertFrom-Json)
+}
+
+function Merge-Provider {
+    # Merge non distruttivo: i campi assenti in $New restano quelli di $Old
+    # (apiKey, promptCache, headers, compat), i modelli sono uniti per id in
+    # posizione, quindi un id nuovo non cancella gli altri.
+    param($Old, $New)
+    $merged = [ordered]@{}
+    if ($Old) {
+        foreach ($p in $Old.PSObject.Properties) { $merged[$p.Name] = $p.Value }
+    }
+    foreach ($k in $New.Keys) { $merged[$k] = $New[$k] }
+
+    $oldModels = @()
+    if ($Old -and ($Old.PSObject.Properties.Name -contains 'models') -and $Old.models) {
+        $oldModels = @($Old.models)
+    }
+    $newModel = $New['models'][0]
+    $newId    = $newModel['id']
+
+    $outModels = @()
+    $found = $false
+    foreach ($m in $oldModels) {
+        if ($m.id -eq $newId) {
+            $outModels += ,(Merge-Model -Old $m -New $newModel)
+            $found = $true
+        } else {
+            $outModels += ,$m
+        }
+    }
+    if (-not $found) { $outModels += ,($newModel | ConvertFrom-Json) }
+
+    $merged['models'] = $outModels
+    return $merged
+}
+
+function Mask-ApiKey {
+    # Copia con apiKey mascherata, per l'anteprima. Il valore in chiaro resta
+    # solo nel file scritto.
+    param($Provider)
+    if ($null -eq $Provider) { return $null }
+    $copy = $Provider | ConvertTo-Json -Depth 10 | ConvertFrom-Json
+    if (($copy.PSObject.Properties.Name -contains 'apiKey') -and $copy.apiKey) {
+        $k = [string]$copy.apiKey
+        $copy.apiKey = if ($k.Length -le 4) { '••••' } else { '••••••••' + $k.Substring($k.Length - 4) }
+    }
+    return $copy
+}
+
+function Save-ConfigBackup {
+    # Copia della versione corrente prima di ogni scrittura. $false se il file
+    # non esiste (niente da conservare) o se la copia fallisce.
+    param([string]$Path)
+    if (-not (Test-Path $Path)) { return $true }
+    try {
+        Copy-Item -Path $Path -Destination "$Path.bak" -Force -ErrorAction Stop
+        return $true
+    } catch {
+        Write-Host "Errore: impossibile creare il backup in $Path.bak" -ForegroundColor Red
+        return $false
+    }
+}
+
 # --- Main -------------------------------------------------------------------
 
 if ($Help) {
@@ -279,7 +352,7 @@ Write-Host "----------------------------------------------------------"
 Write-Host "ANTEPRIMA - verra' scritto in $PiConfFile"
 Write-Host "----------------------------------------------------------"
 Write-Host "Profilo: $ProfileName"
-$provider | ConvertTo-Json -Depth 10
+(Mask-ApiKey -Provider ($provider | ConvertTo-Json -Depth 10 | ConvertFrom-Json)) | ConvertTo-Json -Depth 10
 Write-Host "----------------------------------------------------------"
 
 # Crea directory se non esiste
@@ -302,7 +375,11 @@ if (Test-Path $PiConfFile) {
             }
         }
     } catch {
-        Write-Host "Avviso: $PiConfFile non parsabile, parto da vuoto" -ForegroundColor Yellow
+        # Non ripartire da vuoto: sovrascrivere un file non parsabile
+        # cancellerebbe tutto il suo contenuto. Stesso comportamento di bash.
+        Write-Host "Errore: $PiConfFile non parsabile - $_.Exception.Message" -ForegroundColor Red
+        Write-Host "Nessuna scrittura effettuata. Correggi o sposta il file, poi rilancia." -ForegroundColor Red
+        exit 1
     }
 }
 
@@ -316,7 +393,10 @@ if ($existingObj.PSObject.Properties.Name -contains 'providers' -and $existingOb
 
 if ($providerExists) {
     Write-Host ""
-    Write-Host "(!) Esiste gia' un provider '$ProfileName' - verra' sovrascritto" -ForegroundColor Yellow
+    Write-Host "(!) Esiste gia' un provider '$ProfileName' - verra' aggiornato" -ForegroundColor Yellow
+    Write-Host "    I campi che lo script non gestisce (apiKey, promptCache, headers, compat,"
+    Write-Host "    cost personalizzati) e gli eventuali modelli aggiuntivi vengono conservati."
+    Write-Host "    Viene creato un backup in $PiConfFile.bak"
     $overwrite = Get-PromptYN "     Procedere?" "n"
     if ($overwrite -ne 'y') {
         Write-Host "Annullato."
@@ -332,7 +412,10 @@ if ($confirm -ne 'y') {
     exit 0
 }
 
-# Merge: aggiungi il nuovo provider al dict providers
+# Backup della versione corrente prima di scrivere
+if (-not (Save-ConfigBackup -Path $PiConfFile)) { exit 1 }
+
+# Merge: aggiungi o aggiorna il provider senza perdere i campi non gestiti
 if (-not ($existingObj.PSObject.Properties.Name -contains 'providers')) {
     $existingObj | Add-Member -NotePropertyName 'providers' -NotePropertyValue ([PSCustomObject]@{}) -Force
 }
@@ -340,13 +423,16 @@ if (-not $existingObj.providers) {
     $existingObj.providers = [PSCustomObject]@{}
 }
 
-# Converti provider PSCustomObject per l'assegnazione
-$providerObj = $provider | ConvertFrom-Json
+$oldProvider = $null
+if ($existingObj.providers.PSObject.Properties.Name -contains $ProfileName) {
+    $oldProvider = $existingObj.providers.$ProfileName
+}
+$mergedProvider = Merge-Provider -Old $oldProvider -New $provider
 
 if ($existingObj.providers.PSObject.Properties.Name -contains $ProfileName) {
-    $existingObj.providers.$ProfileName = $providerObj
+    $existingObj.providers.$ProfileName = ($mergedProvider | ConvertFrom-Json)
 } else {
-    $existingObj.providers | Add-Member -NotePropertyName $ProfileName -NotePropertyValue $providerObj -Force
+    $existingObj.providers | Add-Member -NotePropertyName $ProfileName -NotePropertyValue ($mergedProvider | ConvertFrom-Json) -Force
 }
 
 # Salva

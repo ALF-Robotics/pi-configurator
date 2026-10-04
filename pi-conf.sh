@@ -262,19 +262,25 @@ main() {
             }]
         }')"
 
+    # Anteprima: apiKey mascherata, il valore in chiaro resta solo nel file
+    PREVIEW_JSON="$(echo "$PROVIDER_JSON" | jq '.apiKey |= (if . == null or . == "" then . else "••••••••" + .[-4:] end)')"
+
     # Preview
     echo
     echo "----------------------------------------------------------"
     echo "ANTEPRIMA — verra' scritto in $PI_CONF_FILE"
     echo "----------------------------------------------------------"
     echo "Profilo: $PROFILE_NAME"
-    echo "$PROVIDER_JSON" | jq .
+    echo "$PREVIEW_JSON" | jq .
     echo "----------------------------------------------------------"
 
     # Controlla sovrascrittura
     if [[ -f "$PI_CONF_FILE" ]] && jq -e --arg n "$PROFILE_NAME" '.providers[$n]' "$PI_CONF_FILE" >/dev/null 2>&1; then
         echo
-        echo "(!) Esiste gia' un provider '$PROFILE_NAME' — verra' sovrascritto"
+        echo "(!) Esiste gia' un provider '$PROFILE_NAME' — verra' aggiornato"
+        echo "    I campi che lo script non gestisce (apiKey, promptCache, headers, compat,"
+        echo "    cost personalizzati) e gli eventuali modelli aggiuntivi vengono conservati."
+        echo "    Viene creato un backup in $PI_CONF_FILE.bak"
         prompt_yn "     Procedere?" "n"
         if [[ "$REPLY" != "y" ]]; then
             echo "Annullato."
@@ -291,18 +297,46 @@ main() {
     fi
 
     # Crea file se non esiste
-    if [[ ! -f "$PI_CONF_FILE" ]]; then
+    local file_existed=false
+    if [[ -f "$PI_CONF_FILE" ]]; then
+        file_existed=true
+    else
         umask 077
         mkdir -p "$(dirname "$PI_CONF_FILE")"
         echo "{}" > "$PI_CONF_FILE"
     fi
 
-    # Merge con jq
+    # Backup della versione corrente prima di scrivere
+    if [[ "$file_existed" == true ]]; then
+        if ! cp -p "$PI_CONF_FILE" "$PI_CONF_FILE.bak"; then
+            echo "Errore: impossibile creare il backup in $PI_CONF_FILE.bak — file invariato" >&2
+            exit 1
+        fi
+    fi
+
+    # Merge non distruttivo con jq:
+    #   - deep-merge del provider: i campi assenti in $p restano intatti
+    #     (apiKey, promptCache, headers, compat, cost personalizzati)
+    #   - i modelli sono uniti per id: un id nuovo non cancella gli altri e
+    #     un id gia' presente viene aggiornato nella sua posizione
     TMP="$(mktemp)"
     trap 'rm -f "$TMP"' EXIT
 
-    if ! jq --arg name "$PROFILE_NAME" --argjson provider "$PROVIDER_JSON" \
-        '.providers[$name] = $provider' "$PI_CONF_FILE" > "$TMP"; then
+    if ! jq --arg name "$PROFILE_NAME" --argjson p "$PROVIDER_JSON" '
+        .providers[$name] as $old
+        | (($old.models // []) | map(select(.id == $p.models[0].id)) | .[0] // {}) as $om
+        | ($om
+           * ($p.models[0] | .cost = null)
+           * { cost: ($om.cost // { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }) }) as $m
+        | .providers[$name] = (
+            ($old // {})
+            * $p
+            * { models:
+                  ( ($old.models // [])
+                    | map(if .id == $m.id then $m else . end)
+                    | (if any(.[]; .id == $m.id) then . else . + [$m] end) ) }
+          )
+    ' "$PI_CONF_FILE" > "$TMP"; then
         echo "Errore: merge jq fallito, file invariato" >&2
         exit 1
     fi
