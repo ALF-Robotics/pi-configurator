@@ -1,12 +1,21 @@
 # pi-configurator
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![EULA](https://img.shields.io/badge/EULA-v1.1-informational.svg)](EULA.md)
+
 Script interattivi per creare/aggiornare **profili provider custom** di
 [pi-code](https://pi.dev/) (CLI: `@mariozechner/pi-coding-agent`).
 
-Scrivono in `~/.pi/agent/models.json` (Windows: `%USERPROFILE%\.pi\agent\models.json`),
-aggiungendo il provider **senza toccare gli altri**. Attenzione però: se il
-**nome del profilo** esiste già, quel provider viene riscritto per intero — vedi
-[Limiti noti](#limiti-noti).
+> Il codice è sotto licenza [MIT](LICENSE). L'uso dello script come strumento
+> operativo — incluse le credenziali che vi vengono affidate — è disciplinato
+> dalle condizioni dell'[EULA](EULA.md), che coesiste con la MIT e non la
+> sostituisce.
+
+Scrivono in `~/.pi/agent/models.json` (Windows: `%USERPROFILE%\.pi\agent\models.json`)
+facendo **merge**, non sovrascrittura: aggiungono il provider senza toccare
+gli altri, e aggiornano un profilo esistente campo per campo conservando
+`apiKey`, `promptCache`, `headers`, `compat`, `cost` e i modelli aggiuntivi.
+Prima di ogni scrittura viene creato un backup in `models.json.bak`.
 
 ## File
 
@@ -110,8 +119,8 @@ Entrambi richiedono ovviamente `pi` installato e un `~/.pi/agent/` scrivibile.
   accessibile solo al tuo account Windows per default.
 - In entrambi i casi, **non condividere `models.json`**: contiene le API key
   in chiaro.
-- L'**anteprima a terminale** riprende la `apiKey` in chiaro, anche se la
-  mascheri durante la digitazione: resta nello scrollback.
+- L'**anteprima a terminale** maschera la `apiKey`: mostra `••••••••` e le
+  ultime 4 cifre. Il valore in chiaro finisce solo nel file.
 
 ## Esempio di output (anteprima JSON)
 
@@ -145,21 +154,49 @@ Dopo aver creato il profilo puoi editare `models.json` per aggiungere:
 
 pi rilegge `models.json` ad ogni `/model` — nessun restart necessario.
 
-> **Attenzione:** tutti questi campi vengono persi se rilanci lo script sullo
-> stesso nome profilo. Vedi sotto.
+> Questi campi **sopravvivono** a un re-run dello script sullo stesso profilo:
+> il merge è campo per campo e li conserva. Vedi
+> [Come funziona il merge](#come-funziona-il-merge).
+
+## Come funziona il merge
+
+Aggiornare un profilo esistente **non** lo riscrive. I campi che lo script non
+gestisce restano quelli che avevi:
+
+- **`apiKey`** — se lasci il prompt vuoto, la chiave già salvata **resta**.
+  Prima veniva cancellata, ed era il caso più comune.
+- **`promptCache`, `headers`, `compat`, `cost` personalizzati** — conservati.
+- **Modelli aggiuntivi** — uniti per `id`. Un modello nuovo viene aggiunto in
+  coda; un `id` già presente viene aggiornato nella sua posizione, senza
+  riordinare l'elenco.
+- **Provider vicini** — non vengono toccati.
+
+L'unica cosa che cambia è ciò che hai appena risposto ai prompt 7 e 8
+(`contextWindow`, `maxTokens`) e l'`apiKey` **se e solo se** la digiti.
+
+Prima di scrivere, il file corrente viene copiato in `models.json.bak`.
+
+## Test
+
+```bash
+bash tests/pi-conf-test.sh
+```
+
+38 asserzioni che coprono il merge, il backup, il mascheramento in anteprima e
+i permessi del file. Copre `pi-conf.sh` **eseguendolo**; `pi-conf.ps1` è
+preso in carico solo da controlli statici, perché `pwsh` non è necessario per
+eseguire la suite.
 
 ## Limiti noti
 
-Due difetti aperti, entrambi tracciati su GitHub:
-
-- **Il re-run sullo stesso profilo riscrive il provider per intero**
-  ([#1](https://github.com/ALF-Robotics/pi-configurator/issues/1)). Non è un
-  merge campo per campo: modelli aggiuntivi, `apiKey`, `promptCache`,
-  `headers` e `cost` personalizzati spariscono. Nel flusso più comune — API
-  key lasciata vuota perché "la configuri dopo" — è proprio la `apiKey` che
-  viene cancellata. **Fai una copia di `models.json` prima di rilanciare.**
-- **L'anteprima stampa la API key in chiaro**
-  ([#2](https://github.com/ALF-Robotics/pi-configurator/issues/2)).
-
-Nessun backup automatico: lo script scrive con `mv`, quindi un merge andato
-storto non è recuperabile dal file precedente.
+- **La verifica finale è attendibile solo sul config di default.** Con
+  `PI_CONF_FILE` o `PI_CODING_AGENT_DIR` impostati, `pi auth check` legge la
+  configurazione di pi e non il file appena scritto.
+- **Le due implementazioni non sono identiche.** `PI_BIN` ha la precedenza in
+  PowerShell, in bash viene usato solo se `pi` non è in PATH. La gestione del
+  file non leggibile ora è allineata (entrambe abortiscono senza scrivere),
+  ma il resto non è coperto da test.
+- **`pi-conf.ps1` non è eseguito dai test.** Serve una verifica su Windows.
+- **Nessun backup quando il file non esiste**: sul primo salvataggio non c'è
+  nulla da conservare.
+- **`cost` resta a zero** finché non lo editi a mano.
