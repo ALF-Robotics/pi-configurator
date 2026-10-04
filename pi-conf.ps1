@@ -55,8 +55,8 @@ Senza argomenti, lo script e' interattivo e chiede in ordine:
   4. Nome del profilo          (provider name in pi)
   5. API key                   (opzionale: vuoto = configura dopo con /login)
   6. Reasoning? (y/N)
-  7. Context window (default 200000)
-  8. Max output tokens (default 16384)
+  7. Context window (default 512000)
+  8. Max output tokens (default 32768)
 
 Scrive/aggiorna: $PiConfFile (merge con eventuali provider esistenti).
 
@@ -228,7 +228,7 @@ $ReasoningBool = if ($ReasoningChoice -eq 'y') { $true } else { $false }
 
 # 7. Context window
 Write-Host ""
-$ContextWindowStr = Get-PromptInput "7/8  Context window (tokens)" "200000"
+$ContextWindowStr = Get-PromptInput "7/8  Context window (tokens)" "512000"
 if ($ContextWindowStr -notmatch '^\d+$') {
     Write-Host "Errore: deve essere un intero" -ForegroundColor Red
     exit 1
@@ -237,7 +237,7 @@ $ContextWindow = [int]$ContextWindowStr
 
 # 8. Max output tokens
 Write-Host ""
-$MaxTokensStr = Get-PromptInput "8/8  Max output tokens" "16384"
+$MaxTokensStr = Get-PromptInput "8/8  Max output tokens" "32768"
 if ($MaxTokensStr -notmatch '^\d+$') {
     Write-Host "Errore: deve essere un intero" -ForegroundColor Red
     exit 1
