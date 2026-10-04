@@ -39,8 +39,8 @@ Senza argomenti, lo script e' interattivo e chiede in ordine:
   4. Nome del profilo          (provider name in pi)
   5. API key                   (opzionale: vuoto = configura dopo con /login)
   6. Reasoning? (y/N)
-  7. Context window (default 200000)
-  8. Max output tokens (default 16384)
+  7. Context window (default 512000)
+  8. Max output tokens (default 32768)
 
 Scrive/aggiorna: ~/.pi/agent/models.json (merge, mode 0600).
 
@@ -220,7 +220,7 @@ main() {
 
     # 7. Context window
     echo
-    prompt "7/8  Context window (tokens)" "200000"
+    prompt "7/8  Context window (tokens)" "512000"
     CONTEXT_WINDOW="$REPLY"
     if [[ ! "$CONTEXT_WINDOW" =~ ^[0-9]+$ ]]; then
         echo "Errore: deve essere un intero" >&2
@@ -229,7 +229,7 @@ main() {
 
     # 8. Max output tokens
     echo
-    prompt "8/8  Max output tokens" "16384"
+    prompt "8/8  Max output tokens" "32768"
     MAX_TOKENS="$REPLY"
     if [[ ! "$MAX_TOKENS" =~ ^[0-9]+$ ]]; then
         echo "Errore: deve essere un intero" >&2
