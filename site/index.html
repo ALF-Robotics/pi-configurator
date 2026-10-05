@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pi-configurator — profili provider per pi-code</title>
+<meta name="description" content="Installa e configura profili provider di pi-code da remoto, con una riga di comando. macOS, Linux e Windows.">
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --line: #2b3440;
+    --fg: #e6edf3;
+    --muted: #96a0ad;
+    --accent: #4b9fd5;
+    --ok: #4bbf73;
+    --warn: #d6a13a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 48px 22px 80px; }
+  h1 { font-size: 2.1rem; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.15rem; margin: 44px 0 12px; letter-spacing: 0.01em; }
+  p.lede { color: var(--muted); font-size: 1.05rem; margin: 0 0 8px; }
+  a { color: var(--accent); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+
+  .tabs { display: flex; gap: 6px; margin: 14px 0 0; flex-wrap: wrap; }
+  .tab {
+    background: none; border: 1px solid var(--line); color: var(--muted);
+    padding: 7px 15px; border-radius: 7px 7px 0 0; cursor: pointer;
+    font: inherit; font-size: 0.9rem; border-bottom: none;
+  }
+  .tab[aria-selected="true"] { background: var(--panel); color: var(--fg); border-color: var(--line); }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 0 8px 8px 8px; padding: 16px 18px;
+  }
+  pre {
+    margin: 0 0 12px; padding: 13px 15px; background: #0b0f14;
+    border: 1px solid var(--line); border-radius: 7px;
+    overflow-x: auto; font-size: 0.85rem; line-height: 1.5;
+  }
+  pre:last-child { margin-bottom: 0; }
+  .copy { float: right; background: none; border: 1px solid var(--line); color: var(--muted);
+          border-radius: 5px; padding: 2px 9px; font: inherit; font-size: 0.75rem; cursor: pointer; }
+  .copy:hover { color: var(--fg); border-color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td code { color: var(--fg); }
+  .note {
+    border-left: 3px solid var(--warn); background: rgba(214,161,58,0.07);
+    padding: 12px 15px; border-radius: 0 6px 6px 0; margin: 14px 0; font-size: 0.92rem;
+  }
+  .note.ok { border-color: var(--ok); background: rgba(75,191,115,0.07); }
+  .note strong { color: var(--fg); }
+  ul { padding-left: 22px; }
+  li { margin: 5px 0; }
+  footer { margin-top: 52px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.88rem; }
+  .pill { display: inline-block; background: #1c2430; border: 1px solid var(--line);
+          color: var(--muted); border-radius: 999px; padding: 2px 11px; font-size: 0.78rem; margin-left: 7px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>pi-configurator</h1>
+  <p class="lede">
+    Crea e aggiorna profili provider di
+    <a href="https://pi.dev/">pi-code</a> su macOS, Linux e Windows.
+    Si installa con una riga di comando, e non sovrascrive mai quello che hai
+    già configurato.
+    <span class="pill">MIT</span><span class="pill">EULA v1.1</span>
+  </p>
+
+  <h2>Installa</h2>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true"  data-t="unix">macOS / Linux</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="win">Windows</button>
+  </div>
+
+  <div class="panel">
+    <div id="unix">
+      <pre><button class="copy" data-c="curl">copia</button><code>curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh | sh</code></pre>
+      <p class="lede" style="margin:0">Installa in <code>~/.local/bin</code>. Aggiungi quella cartella al <code>PATH</code> se non c'è già.</p>
+    </div>
+    <div id="win" hidden>
+      <pre><button class="copy" data-c="irm">copia</button><code>irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex</code></pre>
+      <p class="lede" style="margin:0">Installa in <code>%USERPROFILE%\.pi-configurator</code>.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Pinna la versione.</strong> <code>main</code> può cambiare in qualsiasi
+    momento. Per un'installazione riproducibile usa un tag:
+    <code>... | sh -s -- --ref v0.2.0</code>
+    Ogni file scaricato viene verificato con lo SHA256 prima di essere
+    installato; se l'hash non corrisponde, l'installazione si ferma senza
+    scrivere nulla.
+  </div>
+
+  <h2>Configura un provider</h2>
+  <p class="lede">
+    Senza una riga di comando, senza prompt, e <strong>senza scrivere la chiave
+    in chiaro</strong> nel file di configurazione.
+  </p>
+
+  <div class="panel">
+    <pre><button class="copy" data-c="cfg">copia</button><code>pi-conf.sh add \
+  --endpoint https://api.server.example \
+  --api anthropic \
+  --model MLR-3 \
+  --key-env MLR_API_KEY \
+  --yes</code></pre>
+    <p class="lede" style="margin:0">
+      <code>--key-env</code> scrive <code>"apiKey": "$MLR_API_KEY"</code> nel file.
+      Pi la risolve dall'ambiente a ogni richiesta, quindi la credenziale non
+      finisce mai su disco in chiaro.
+    </p>
+  </div>
+
+  <p class="lede" style="margin-top:16px">
+    Oppure installa e configura nella stessa invocazione:
+  </p>
+  <div class="panel">
+    <pre><button class="copy" data-c="both">copia</button><code>curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh \
+  | sh -s -- --ref v0.2.0 -- \
+      --endpoint https://api.server.example --api anthropic \
+      --model MLR-3 --key-env MLR_API_KEY</code></pre>
+  </div>
+
+  <h2>Cosa garantisce</h2>
+  <table>
+    <tr><th>Proprietà</th><th>Come</th></tr>
+    <tr>
+      <td>Non sovrascrive</td>
+      <td>Il merge è campo per campo. <code>apiKey</code>, <code>promptCache</code>,
+          <code>headers</code>, <code>compat</code> e i <code>cost</code> reali
+          restano, e i modelli sono uniti per <code>id</code> senza riordinare.</td>
+    </tr>
+    <tr>
+      <td>Backup</td>
+      <td>Prima di ogni scrittura su un file esistente viene creato
+          <code>models.json.bak</code>.</td>
+    </tr>
+    <tr>
+      <td>Anteprima sicura</td>
+      <td>L'anteprima a terminale maschera la chiave: mostra
+          <code>••••••••</code> e le ultime 4 cifre.</td>
+    </tr>
+    <tr>
+      <td>File illeggibile</td>
+      <td>Se <code>models.json</code> non è JSON valido, nessuna delle due
+          implementazioni scrive: si fermano e segnalano.</td>
+    </tr>
+    <tr>
+      <td>Verificato</td>
+      <td><a href="https://github.com/ALF-Robotics/pi-configurator">90 asserzioni</a>
+          coprono merge, backup, mascheramento, permessi, modalità non
+          interattiva e installer.</td>
+    </tr>
+  </table>
+
+  <h2>Default</h2>
+  <table>
+    <tr><th>Impostazione</th><th>Default</th></tr>
+    <tr><td>Standard API</td><td><code>anthropic-messages</code></td></tr>
+    <tr><td>Reasoning</td><td>attivo</td></tr>
+    <tr><td>Context window</td><td><code>512000</code></td></tr>
+    <tr><td>Max output tokens</td><td><code>32768</code></td></tr>
+  </table>
+  <div class="note">
+    <strong>Attenzione.</strong> <code>maxTokens</code> comprende i token di
+    ragionamento. Con reasoning attivo i 32768 sono il budget di ragionamento
+    <em>più</em> risposta: è il motivo per cui il default non è più basso.
+  </div>
+
+  <h2>Opzioni dell'installer</h2>
+  <table>
+    <tr><th>Opzione</th><th>Effetto</th></tr>
+    <tr><td><code>--ref &lt;tag&gt;</code></td><td>Installa una versione specifica. Un tag rende l'URL immutabile.</td></tr>
+    <tr><td><code>--prefix &lt;dir&gt;</code></td><td>Dove installare. Default <code>~/.local/bin</code>.</td></tr>
+    <tr><td><code>--dry-run</code></td><td>Mostra il piano senza scrivere.</td></tr>
+    <tr><td><code>--no-verify</code></td><td>Salta il controllo SHA256.</td></tr>
+    <tr><td><code>-- &lt;args&gt;</code></td><td>Passa tutto il resto a <code>pi-conf.sh</code>.</td></tr>
+  </table>
+
+  <footer>
+    MIT · <a href="https://github.com/ALF-Robotics/pi-configurator">ALF-Robotics/pi-configurator</a>
+    · <a href="https://github.com/ALF-Robotics/pi-configurator/blob/main/README.md">documentazione completa</a>
+    · <a href="https://github.com/ALF-Robotics/pi-configurator/blob/main/EULA.md">EULA</a>
+  </footer>
+
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(function (t) {
+  t.addEventListener('click', function () {
+    document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-selected', 'false'); });
+    document.querySelectorAll('.panel > div').forEach(function (d) { d.hidden = true; });
+    t.setAttribute('aria-selected', 'true');
+    document.getElementById(t.dataset.t).hidden = false;
+  });
+});
+document.querySelectorAll('.copy').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var pre = b.parentNode;
+    var text = pre.textContent.replace(/^copia/, '');
+    navigator.clipboard.writeText(text).then(function () {
+      var old = b.textContent; b.textContent = 'copiato';
+      setTimeout(function () { b.textContent = old; }, 1400);
+    });
+  });
+});
+</script>
+</body>
+</html>

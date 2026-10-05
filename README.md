@@ -33,12 +33,42 @@ gli altri, e aggiornano un profilo esistente campo per campo conservando
 `apiKey`, `promptCache`, `headers`, `compat`, `cost` e i modelli aggiuntivi.
 Prima di ogni scrittura viene creato un backup in `models.json.bak`.
 
+## Installa
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh | sh
+```
+
+```powershell
+# Windows
+irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex
+```
+
+Installa in `~/.local/bin` (Windows: `%USERPROFILE%\.pi-configurator`) e verifica
+ogni file scaricato con lo SHA256 prima di scrivere: se l'hash non corrisponde
+l'installazione si ferma senza toccare nulla.
+
+**Pinna la versione.** `main` può cambiare in qualsiasi momento; un tag no:
+
+```bash
+curl -fsSL .../main/install.sh | sh -s -- --ref v0.2.0
+```
+
+Opzioni dell'installer: `--ref`, `--prefix`, `--dry-run`, `--no-verify`, e `--`
+seguito dagli argomenti da passare a `pi-conf.sh` per installare e configurare
+nella stessa invocazione.
+
 ## File
 
 | File | OS | Shell |
 |---|---|---|
 | `pi-conf.sh` | macOS / Linux | bash 3.2+ (anche bash 4/5) |
 | `pi-conf.ps1` | Windows | PowerShell 5.1 (default Win10/11) o pwsh 7+ |
+| `install.sh` | macOS / Linux | POSIX sh, senza dipendenze oltre `curl`/`wget` |
+| `install.ps1` | Windows | PowerShell 5.1 o pwsh 7+ |
+| `site/index.html` | — | pagina di supporto, autoportante |
+| `tests/pi-conf-test.sh` | macOS / Linux | suite di test |
 
 ## Cosa fa
 
@@ -119,6 +149,47 @@ Con `PI_CONF_FILE` o `PI_CODING_AGENT_DIR` impostati, la verifica finale non
 è attendibile: `pi auth check` legge la configurazione di pi, non il file che
 lo script ha appena scritto.
 
+## Uso non interattivo
+
+Senza `add` gli script fanno le 8 domande. Con `add` (o con i flag da soli,
+che lo implicano) non fanno domande e sono adatti a provisioning e script:
+
+```bash
+pi-conf.sh add \
+  --endpoint https://api.server.example \
+  --api anthropic \
+  --model MLR-3 \
+  --key-env MLR_API_KEY \
+  --yes
+```
+
+```powershell
+.\pi-conf.ps1 add -Endpoint https://api.server.example -Api anthropic `
+  -Model MLR-3 -KeyEnv MLR_API_KEY
+```
+
+| Flag | Default | Note |
+|---|---|---|
+| `--endpoint <url>` | — | obbligatorio, salvo `--from-file` |
+| `--api <nome>` | `anthropic` | friendly name, vedi elenco sopra |
+| `--model <id>` | — | obbligatorio, salvo `--from-file` |
+| `--profile <nome>` | model id sanitizzato | |
+| `--key <valore>` | — | scrive la chiave **in chiaro**, sconsigliato |
+| `--key-env <NOME>` | — | scrive `"apiKey": "$NOME"`, **usalo questo** |
+| `--reasoning` / `--no-reasoning` | attivo | |
+| `--context <n>` | `512000` | |
+| `--max-tokens <n>` | `32768` | |
+| `--from-file <json>` | — | riempie i campi mancanti |
+| `--config <path>` | config di pi | dove scrivere |
+| `--dry-run` | — | anteprima, non scrive |
+| `--print-config` | — | JSON risultante su stdout |
+| `--yes` | — | non chiede conferma |
+
+**`--key-env` è l'opzione che conta.** Pi risolve `"$MLR_API_KEY"` dall'ambiente
+a ogni richiesta, quindi la credenziale non finisce mai in chiaro in
+`models.json`. Se la variabile non è impostata quando parte pi, il provider
+risulta non autenticato.
+
 ## Dipendenze
 
 | Script | Richiede |
@@ -198,13 +269,31 @@ Prima di scrivere, il file corrente viene copiato in `models.json.bak`.
 bash tests/pi-conf-test.sh
 ```
 
-38 asserzioni che coprono il merge, il backup, il mascheramento in anteprima e
-i permessi del file. Copre `pi-conf.sh` **eseguendolo**; `pi-conf.ps1` è
-preso in carico solo da controlli statici, perché `pwsh` non è necessario per
-eseguire la suite.
+90 asserzioni in 13 sezioni. Coprono merge non distruttivo, backup, mascheramento
+in anteprima, permessi del file, modalità non interattiva, `sanitize_name`,
+l'installer e una guardia che verifica che la suite non abbia mai toccato il
+`models.json` reale.
+
+`pi-conf.sh` e `install.sh` sono coperti **eseguendoli**; `pi-conf.ps1` e
+`install.ps1` sono presi in carico solo da controlli statici, perché `pwsh` non
+è necessario per eseguire la suite.
+
+La suite è stata verificata per sabotaggio: disattivando la verifica SHA256
+dell'installer, il ritaglio del trattino in `sanitize_name` o la scrittura di
+`--key-env` come riferimento env, la suite fallisce in tutti e tre i casi.
 
 ## Limiti noti
 
+- **`pi-conf.ps1` e `install.ps1` non sono mai stati eseguiti.** La copertura
+  è statica (grafi bilanciati, presenza dei marker, coerenza dei default fra le
+  due implementazioni). La logica PowerShell va verificata su Windows.
+- **L'installer non è mai stato provato contro GitHub.** I test lo esercitano da
+  checkout locale, che è un percorso diverso dal download via rete. La
+  verifica SHA256 è provata alterando un file in locale, non simulatingando un
+  scaricamento corrotto.
+- **Il repo è privato**, quindi la riga di installazione con
+  `raw.githubusercontent.com` funziona solo se il repo diventa pubblico. Con il
+  repo privato serve `git clone` o autenticazione.
 - **La verifica finale è attendibile solo sul config di default.** Con
   `PI_CONF_FILE` o `PI_CODING_AGENT_DIR` impostati, `pi auth check` legge la
   configurazione di pi e non il file appena scritto.
@@ -212,7 +301,8 @@ eseguire la suite.
   PowerShell, in bash viene usato solo se `pi` non è in PATH. La gestione del
   file non leggibile ora è allineata (entrambe abortiscono senza scrivere),
   ma il resto non è coperto da test.
-- **`pi-conf.ps1` non è eseguito dai test.** Serve una verifica su Windows.
 - **Nessun backup quando il file non esiste**: sul primo salvataggio non c'è
-  nulla da conservare.
-- **`cost` resta a zero** finché non lo editi a mano.
+  nulla da conservare. E il backup viene sovrascritto a ogni esecuzione.
+- **`cost` resta a zero** finché non lo editi a mano, e `input: ["text"]` è
+  fisso: niente input multimodale.
+- **Nessuna CI**: la suite passa solo se qualcuno la lancia.
