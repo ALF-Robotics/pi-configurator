@@ -1,36 +1,42 @@
 # ─────────────────────────────────────────────────────────────────
 # pi-configurator .gitignore
 # Script bash + PowerShell, niente build artifacts.
+#
+# ATTENZIONE: in .gitignore un "#" a fine riga NON e' un commento,
+# fa parte del pattern. I commenti vanno su una riga separata.
+# Verifica: git check-ignore -v <path>
 # ─────────────────────────────────────────────────────────────────
 
-# OS / file manager
-.DS_Store                  # macOS Finder
-._*                        # macOS resource forks (AppleDouble)
-.Spotlight-V100            # macOS Spotlight
-.Trashes                   # macOS trash
-Thumbs.db                  # Windows thumbnails
-desktop.ini                # Windows folder settings
-ehthumbs.db                # Windows legacy thumbs
-ehthumbs_vista.db
-$RECYCLE.BIN/              # Windows recycle bin
+# ── macOS ──
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
 
-# Editor / IDE
-.vscode/                   # VSCode user settings (per-user, non condivisi)
-.idea/                     # JetBrains
-*.swp                      # Vim swap
+# ── Windows ──
+Thumbs.db
+desktop.ini
+ehthumbs.db
+ehthumbs_vista.db
+$RECYCLE.BIN/
+
+# ── Editor / IDE ──
+.vscode/
+.idea/
+*.swp
 *.swo
 *.swn
 *~
-.\#*                      # Emacs lock files
-\#*\#                     # Emacs autosave
+.\#*
+\#*\#
 
-# Backup / temp
+# ── Backup / temp ──
 *.bak
 *.tmp
-*.orig                     # merge originals
-*.rej                      # merge rejects
+*.orig
+*.rej
 
-# Test / build artifacts (se aggiungi test in futuro)
+# ── Test / build artifacts ──
 *.log
 logs/
 coverage/
@@ -38,7 +44,7 @@ tmp/
 test-output/
 *.out
 
-# Secrets & local config
+# ── Secrets & local config ──
 # Lo script non salva segreti nel progetto, ma se aggiungi un .env per
 # testare in locale evita commit accidentali.
 .env
@@ -49,9 +55,9 @@ test-output/
 *.secret
 *credentials*
 
-# PowerShell
-*.ps1.xml                  # script signing metadata
+# ── PowerShell ──
+*.ps1.xml
 
-# Shell history (se esegui script dalla repo)
+# ── Shell history (se esegui script dalla repo) ──
 .history
 .bash_history_local
