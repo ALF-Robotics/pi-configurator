@@ -203,8 +203,12 @@ build_provider_json() {
 }
 
 # Maschera l'apiKey per la sola anteprima a terminale.
+# `has("apiKey")` e' necessario: in jq, `|=` su una chiave assente la crea con
+# null, e l'anteprima mostrerebbe un campo che nel file non esiste.
 mask_api_key() {
-    jq '.apiKey |= (if . == null or . == "" then . else "••••••••" + .[-4:] end)'
+    jq 'if has("apiKey")
+        then .apiKey |= (if . == null or . == "" then . else "••••••••" + .[-4:] end)
+        else . end'
 }
 
 # write_provider <profileName> <providerJson>
