@@ -20,7 +20,7 @@
 [![dep](https://img.shields.io/badge/dep-jq-c0c0c0)](#dipendenze)
 
 Script interattivi per creare/aggiornare **profili provider custom** di
-[pi-code](https://pi.dev/) (CLI: `@mariozechner/pi-coding-agent`).
+[pi-code](https://pi.dev/) (CLI: `@earendil-works/pi-coding-agent`).
 
 > Il codice è sotto licenza [MIT](LICENSE). L'uso dello script come strumento
 > operativo — incluse le credenziali che vi vengono affidate — è disciplinato
