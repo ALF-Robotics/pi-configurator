@@ -12,7 +12,8 @@
 [![tag](https://img.shields.io/github/v/tag/ALF-Robotics/pi-configurator?style=flat&label=release)](https://github.com/ALF-Robotics/pi-configurator/releases)
 [![last-commit](https://img.shields.io/github/last-commit/ALF-Robotics/pi-configurator?style=flat)](https://github.com/ALF-Robotics/pi-configurator/commits/main)
 [![stars](https://img.shields.io/github/stars/ALF-Robotics/pi-configurator?style=flat&label=stars)](https://github.com/ALF-Robotics/pi-configurator/stargazers)
-[![EULA](https://img.shields.io/badge/EULA-v1.1-informational)](EULA.md)
+[![EULA](https://img.shields.io/badge/EULA-v1.1-informational)](EULA.en.md)
+[![EULA-it](https://img.shields.io/badge/EULA-IT-informational)](EULA.md)
 [![type](https://img.shields.io/badge/type-utility-blueviolet)](#-what-it-does)
 [![target](https://img.shields.io/badge/target-pi%20%28pi--coding--agent%29-ff69d4)](https://pi.dev/)
 [![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#-files)
@@ -31,11 +32,12 @@
 > [!IMPORTANT]
 > The code is licensed under the [MIT License](LICENSE). Use of the script as an
 > operational tool — including the credentials entrusted to it — is governed by the
-> terms of the [EULA](EULA.md) v1.1, which **coexists** with MIT and does not
+> terms of the [EULA](EULA.en.md) v1.1, which **coexists** with MIT and does not
 > replace it.
 >
-> The EULA is published in **Italian only** and is the authoritative version; this
-> summary does not replace it.
+> This English version is a convenience translation with no autonomous legal
+> effect. The **Italian original** ([EULA.md](EULA.md)) is the authoritative one
+> and prevails in case of any divergence.
 
 ## 📋 Table of contents
 
@@ -391,7 +393,7 @@ suite **fails** in all five cases.
 
 <div align="center">
 
-**MIT** · [EULA v1.1](EULA.md) · release [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases)
+**MIT** · [EULA v1.1](EULA.en.md) ([IT](EULA.md)) · release [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases)
 
 <sub>🇮🇹 <a href="README.md">Italiano</a> · 🇬🇧 <b>English</b></sub>
 
