@@ -24,6 +24,8 @@
 </div>
 
 <p align="center">
+  <a href="https://alf-robotics.github.io/pi-configurator/"><b>🌐 Support page</b></a>
+  &nbsp;·&nbsp;
   🇮🇹 <a href="README.md"><b>Italiano</b></a> &nbsp;·&nbsp; 🇬🇧 <b>English</b>
 </p>
 
@@ -493,7 +495,7 @@ suite **fails** in all five cases.
 
 <div align="center">
 
-**MIT** · [EULA v1.1](EULA.en.md) ([IT](EULA.md)) · release [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases)
+**MIT** · [EULA v1.1](EULA.en.md) ([IT](EULA.md)) · release [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 support page](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <a href="README.md">Italiano</a> · 🇬🇧 <b>English</b></sub>
 

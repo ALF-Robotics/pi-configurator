@@ -24,6 +24,8 @@
 </div>
 
 <p align="center">
+  <a href="https://alf-robotics.github.io/pi-configurator/"><b>🌐 Pagina di supporto</b></a>
+  &nbsp;·&nbsp;
   🇮🇹 <b>Italiano</b> &nbsp;·&nbsp; 🇬🇧 <a href="README.en.md"><b>English</b></a>
 </p>
 
@@ -491,7 +493,7 @@ guardia `has("apiKey")`, la suite **fallisce** in tutti e cinque i casi.
 
 <div align="center">
 
-**MIT** · [EULA v1.1](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases)
+**MIT** · [EULA v1.1](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <b>Italiano</b> · 🇬🇧 <a href="README.en.md">English</a></sub>
 
