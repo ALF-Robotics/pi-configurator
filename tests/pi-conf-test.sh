@@ -207,6 +207,37 @@ if grep -q 'function Mask-ApiKey' "$CONF_PS1"; then ok "helper Mask-ApiKey prese
 else fail "helper Mask-ApiKey presente" "function Mask-ApiKey" "assente"; fi
 if grep -q 'function Save-ConfigBackup' "$CONF_PS1"; then ok "helper Save-ConfigBackup presente"
 else fail "helper Save-ConfigBackup presente" "function Save-ConfigBackup" "assente"; fi
+if grep -q 'function Get-AddOptions' "$CONF_PS1"; then ok "parser Get-AddOptions presente"
+else fail "parser Get-AddOptions presente" "function Get-AddOptions" "assente"; fi
+if grep -q 'function Invoke-Add' "$CONF_PS1"; then ok "Invoke-Add presente"
+else fail "Invoke-Add presente" "function Invoke-Add" "assente"; fi
+if grep -q 'function Show-AddUsage' "$CONF_PS1"; then ok "Show-AddUsage presente"
+else fail "Show-AddUsage presente" "function Show-AddUsage" "assente"; fi
+if grep -q 'ValueFromRemainingArguments' "$CONF_PS1"; then ok "parametro \$Rest cattura gli argomenti"
+else fail "parametro \$Rest cattura gli argomenti" "ValueFromRemainingArguments" "assente"; fi
+# i default delle due implementazioni non devono divergere
+defaults_of() {  # <file> <bash|ps1>
+    python3 - "$1" "$2" <<'PY'
+import re, sys
+src, kind = open(sys.argv[1]).read(), sys.argv[2]
+pats = {
+  'bash': ((r'ctx="\$\{OPT_CONTEXT:-(\d+)\}"', 'ctx'),
+           (r'max="\$\{OPT_MAXTOK:-(\d+)\}"',   'max')),
+  'ps1':  ((r"\$ctx\s*=\s*if\s*\(.*?else\s*\{\s*'(\d+)'\s*\}", 'ctx'),
+           (r"\$max\s*=\s*if\s*\(.*?else\s*\{\s*'(\d+)'\s*\}", 'max')),
+}[kind]
+out = []
+for pat, key in pats:
+    m = re.search(pat, src, re.S)
+    out.append(f"{key}={m.group(1) if m else '?'}")
+print(" ".join(out))
+PY
+}
+sh_def=$(defaults_of "$CONF_SH" bash)
+ps_def=$(defaults_of "$CONF_PS1" ps1)
+[[ "$sh_def" == "$ps_def" && "$sh_def" != *"=?"* ]] \
+    && ok "default coerenti fra bash e PowerShell ($sh_def)" \
+    || fail "default coerenti fra bash e PowerShell" "stessi valori, nessuno mancante" "bash='$sh_def' ps1='$ps_def'"
 echo
 
 # --- §10 non-interactive mode: the one-line installer's entry point ---------

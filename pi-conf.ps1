@@ -10,7 +10,10 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Help
+    [switch]$Help,
+    # Tutto il resto della riga di comando, per la modalita' non interattiva.
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Rest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -237,6 +240,277 @@ function Save-ConfigBackup {
     }
 }
 
+function Show-AddUsage {
+    @"
+pi-conf.ps1 add - scrive un profilo provider senza porre domande
+
+Uso:
+  .\pi-conf.ps1 add -Endpoint <url> -Model <id> [opzioni]
+  .\pi-conf.ps1      -Endpoint <url> -Model <id> [opzioni]   # 'add' implicito
+
+Opzioni:
+  -Endpoint <url>       endpoint base (obbligatorio, salvo -FromFile)
+  -Api <nome>           anthropic|openai|responses|google|mistral|bedrock|
+                        vertex|codex|azure|<raw>        (default: anthropic)
+  -Model <id>           model id, es. MLR-3              (obbligatorio, salvo -FromFile)
+  -Profile <nome>       nome provider in pi (default: model id sanitizzato)
+  -Key <valore>         chiave in chiaro (sconsigliato)
+  -KeyEnv <NOME>        scrive "apiKey": "`$NOME": pi la risolve a richiesta
+  -Reasoning            reasoning esteso (default)
+  -NoReasoning          disattiva il reasoning
+  -Context <n>          context window      (default: 512000)
+  -MaxTokens <n>        max output tokens   (default: 32768)
+  -FromFile <json>      valori mancanti da un JSON
+  -Config <path>        models.json da scrivere
+  -DryRun               stampa l'anteprima e non scrive
+  -PrintConfig          stampa la configurazione risultante su stdout
+
+Esempio:
+  .\pi-conf.ps1 add -Endpoint https://api.server.example -Api anthropic `
+    -Model MLR-3 -KeyEnv MLR_API_KEY
+"@
+}
+
+function Get-AddOptions {
+    # Parsing della riga di comando non interattiva.
+    # Restituisce un hashtable, oppure `$null` se non serve la modalita' add.
+    # Accetta sia le forme lunghe GNU (`--endpoint URL`) sia quelle corte
+    # PowerShell (`-Endpoint URL`).
+    $triggers = @('add','--endpoint','-endpoint','--api','-api','--model','-model',
+                  '--profile','-profile','--key','-key','--key-env','-keyenv',
+                  '--reasoning','--no-reasoning','-noreasoning',
+                  '--context','-context','--max-tokens','-maxtokens',
+                  '--from-file','-fromfile','--config','-config',
+                  '--dry-run','--print-config','-printconfig','--yes','-y')
+    $long = @('--endpoint','--api','--model','--profile','--key','--key-env',
+              '--context','--max-tokens','--from-file','--config')
+
+    $isAdd = $false
+    foreach ($a in $Args) {
+        if ($triggers -contains $a) { $isAdd = $true; break }
+        $name = ($a -split '=', 2)[0]
+        if ($triggers -contains $name) { $isAdd = $true; break }
+    }
+    if (-not $isAdd) { return $null }
+
+    # normalizza "-Endpoint URL" / "--endpoint URL" in "-Endpoint=URL"
+    $norm = @()
+    $i = 0
+    while ($i -lt $Args.Count) {
+        $a = $Args[$i]
+        $isFlag = $false
+        foreach ($t in $triggers) { if ($a -eq $t) { $isFlag = $true } }
+        if ($isFlag) { $norm += $a; $i++; continue }
+        if ($a -match '^--?[A-Za-z-]+$' -and ($i + 1) -lt $Args.Count) {
+            $norm += "$a=$($Args[$i + 1])"; $i += 2; continue
+        }
+        $norm += $a; $i++
+    }
+
+    $o = @{
+        endpoint = $null; api = 'anthropic'; model = $null; profile = $null
+        key = $null;     keyEnv = $null; reasoning = 'y'
+        context = $null; maxTokens = $null
+        fromFile = $null; config = $null
+        dryRun = $false; printConfig = $false
+    }
+
+    foreach ($a in $norm) {
+        $k = $a; $v = $null
+        if ($a -match '^(.+?)=(.*)$') { $k = $Matches[1]; $v = $Matches[2] }
+        switch ($k.ToLower()) {
+            'add'            { }
+            '--reasoning'    { $o.reasoning = 'y' }
+            '--no-reasoning' { $o.reasoning = 'n' }
+            '--dry-run'      { $o.dryRun = $true }
+            '--print-config' { $o.printConfig = $true }
+            '--yes'          { }
+            '--endpoint'     { $o.endpoint   = $v }
+            '--api'          { $o.api        = $v }
+            '--model'        { $o.model      = $v }
+            '--profile'      { $o.profile    = $v }
+            '--key'          { $o.key        = $v }
+            '--key-env'      { $o.keyEnv     = $v }
+            '--context'      { $o.context    = $v }
+            '--max-tokens'   { $o.maxTokens  = $v }
+            '--from-file'    { $o.fromFile   = $v }
+            '--config'       { $o.config     = $v }
+            default {
+                Write-Host "Errore: argomento sconosciuto: $k" -ForegroundColor Red
+                Show-AddUsage | Out-Null
+                return $null
+            }
+        }
+    }
+    return $o
+}
+
+function Invoke-Add {
+    param([hashtable]$O)
+
+    if ($O.fromFile) {
+        if (-not (Test-Path $O.fromFile)) {
+            Write-Host "Errore: --from-file '$($O.fromFile)' non esiste" -ForegroundColor Red
+            return 1
+        }
+        try { $f = Get-Content $O.fromFile -Raw | ConvertFrom-Json }
+        catch {
+            Write-Host "Errore: --from-file '$($O.fromFile)' non e' JSON valido" -ForegroundColor Red
+            return 1
+        }
+        if (-not $O.endpoint)   { $O.endpoint   = $f.endpoint }
+        if ($O.api -eq 'anthropic' -and $f.PSObject.Properties.Name -contains 'api') { $O.api = $f.api }
+        if (-not $O.model)     { $O.model      = $f.model }
+        if (-not $O.profile)   { $O.profile    = $f.profile }
+        if (-not $O.keyEnv)    { $O.keyEnv     = $f.keyEnv }
+        if (-not $O.context)   { $O.context    = $f.context }
+        if (-not $O.maxTokens) { $O.maxTokens  = $f.maxTokens }
+        if (($f.PSObject.Properties.Name -contains 'reasoning') -and $f.reasoning -eq $false -and $O.reasoning -eq 'y') {
+            $O.reasoning = 'n'
+        }
+    }
+
+    if (-not $O.endpoint) {
+        Write-Host "Errore: manca --endpoint (obbligatorio)" -ForegroundColor Red
+        return 1
+    }
+    if ($O.endpoint -notmatch '^https?://') {
+        Write-Host "Errore: endpoint non valido: deve iniziare con http:// o https://" -ForegroundColor Red
+        return 1
+    }
+    if (-not $O.model) {
+        Write-Host "Errore: manca --model (obbligatorio)" -ForegroundColor Red
+        return 1
+    }
+    if ($O.key -and $O.keyEnv) {
+        Write-Host "Errore: --key e --key-env sono incompatibili: scegline uno" -ForegroundColor Red
+        return 1
+    }
+
+    $profile = $O.profile
+    if (-not $profile) {
+        $profile = Get-SanitizedName $O.model
+        if (-not $profile) { $profile = 'custom-provider' }
+    }
+    if ($profile -notmatch '^[a-zA-Z0-9_-]+$') {
+        Write-Host "Errore: nome profilo '$profile' non valido (usa solo [a-zA-Z0-9_-])" -ForegroundColor Red
+        return 1
+    }
+
+    $ctx = if ($O.context)   { $O.context }   else { '512000' }
+    $max = if ($O.maxTokens) { $O.maxTokens } else { '32768' }
+    if ("$ctx" -notmatch '^\d+$') {
+        Write-Host "Errore: --context deve essere un intero" -ForegroundColor Red
+        return 1
+    }
+    if ("$max" -notmatch '^\d+$') {
+        Write-Host "Errore: --max-tokens deve essere un intero" -ForegroundColor Red
+        return 1
+    }
+
+    # -KeyEnv scrive il riferimento "$NOME": pi interpola l'env var a richiesta,
+    # quindi la chiave non finisce mai in chiaro nel file.
+    $apiKey = ''
+    if ($O.keyEnv) {
+        if ($O.keyEnv -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
+            Write-Host "Errore: --key-env '$($O.keyEnv)' non e' un nome di variabile valido" -ForegroundColor Red
+            return 1
+        }
+        $apiKey = '$' + $O.keyEnv
+    } elseif ($O.key) {
+        $apiKey = $O.key
+    }
+
+    $reasoningBool = if ($O.reasoning -eq 'y') { $true } else { $false }
+
+    $provider = [ordered]@{
+        baseUrl = $O.endpoint
+        api     = (Map-Standard $O.api)
+    }
+    if ($apiKey -ne '') { $provider['apiKey'] = $apiKey }
+    $provider['models'] = @([ordered]@{
+        id            = $O.model
+        name          = $O.model
+        reasoning     = $reasoningBool
+        input         = @('text')
+        contextWindow = [int]$ctx
+        maxTokens     = [int]$max
+        cost          = [ordered]@{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }
+    })
+    $pjson = $provider | ConvertTo-Json -Depth 10
+
+    if ($O.dryRun) {
+        Write-Host "ANTEPRIMA (dry-run, nulla scritto in $PiConfFile)"
+        (Mask-ApiKey -Provider ($pjson | ConvertFrom-Json)) | ConvertTo-Json -Depth 10
+        return 0
+    }
+
+    if ($O.printConfig) {
+        $base = [PSCustomObject]@{ providers = [PSCustomObject]@{} }
+        if (Test-Path $PiConfFile) { $base = Get-Content $PiConfFile -Raw -Encoding UTF8 | ConvertFrom-Json }
+        $oldProvider = $null
+        if (($base.PSObject.Properties.Name -contains 'providers') -and $base.providers -and
+            ($base.providers.PSObject.Properties.Name -contains $profile)) {
+            $oldProvider = $base.providers.$profile
+        }
+        $merged = Merge-Provider -Old $oldProvider -New $provider
+        $providers = [ordered]@{}
+        if ($base.providers) {
+            foreach ($pr in $base.providers.PSObject.Properties) { $providers[$pr.Name] = $pr.Value }
+        }
+        $providers[$profile] = ($merged | ConvertFrom-Json)
+        [PSCustomObject]@{ providers = $providers } | ConvertTo-Json -Depth 10
+        return 0
+    }
+
+    # Carica esistente: se il file non e' parsabile si abortisce senza scrivere,
+    # stesso comportamento di pi-conf.sh.
+    $existingObj = [PSCustomObject]@{ providers = [PSCustomObject]@{} }
+    if (Test-Path $PiConfFile) {
+        try {
+            $raw = Get-Content $PiConfFile -Raw -Encoding UTF8
+            if (-not [string]::IsNullOrWhiteSpace($raw)) {
+                $parsed = $raw | ConvertFrom-Json
+                if (($parsed.PSObject.Properties.Name -contains 'providers') -and $parsed.providers) {
+                    $existingObj = $parsed
+                }
+            }
+        } catch {
+            Write-Host "Errore: $PiConfFile non parsabile - $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Nessuna scrittura effettuata. Correggi o sposta il file, poi rilancia." -ForegroundColor Red
+            return 1
+        }
+    }
+
+    if (-not (Save-ConfigBackup -Path $PiConfFile)) { return 1 }
+
+    if (-not ($existingObj.PSObject.Properties.Name -contains 'providers')) {
+        $existingObj | Add-Member -NotePropertyName 'providers' -NotePropertyValue ([PSCustomObject]@{}) -Force
+    }
+    if (-not $existingObj.providers) { $existingObj.providers = [PSCustomObject]@{} }
+
+    $oldProvider = $null
+    if ($existingObj.providers.PSObject.Properties.Name -contains $profile) {
+        $oldProvider = $existingObj.providers.$profile
+    }
+    $merged = Merge-Provider -Old $oldProvider -New $provider
+
+    if ($existingObj.providers.PSObject.Properties.Name -contains $profile) {
+        $existingObj.providers.$profile = ($merged | ConvertFrom-Json)
+    } else {
+        $existingObj.providers | Add-Member -NotePropertyName $profile -NotePropertyValue ($merged | ConvertFrom-Json) -Force
+    }
+
+    $existingObj | ConvertTo-Json -Depth 10 | Set-Content -Path $PiConfFile -Encoding UTF8
+
+    Write-Host ""
+    Write-Host "OK - provider '$profile' salvato in $PiConfFile"
+    if ($O.keyEnv) {
+        Write-Host "     apiKey: letta dall'env var $($O.keyEnv) (non scritta in chiaro)"
+    }
+    return 0
+}
+
 # --- Main -------------------------------------------------------------------
 
 if ($Help) {
@@ -246,6 +520,14 @@ if ($Help) {
 
 Write-Host "pi-conf.ps1 — creazione profilo provider per pi-code"
 Write-Host "=================================================="
+
+# Percorso non interattivo: richiesto esplicitamente o implicito da un flag.
+$addOpts = Get-AddOptions -Args $Rest
+if ($addOpts) {
+    if ($addOpts.config) { $PiConfFile = $addOpts.config }
+    exit (Invoke-Add -O $addOpts)
+}
+
 Write-Host "Config: $PiConfFile"
 Write-Host "Binario pi: $PiBin"
 Write-Host ""
