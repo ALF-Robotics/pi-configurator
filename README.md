@@ -39,6 +39,7 @@
 ## 📋 Indice
 
 - [Installazione rapida](#-installazione-rapida)
+- [Let your AI set it up](#-let-your-ai-set-it-up)
 - [Cosa fa](#-cosa-fa)
 - [Come funziona il merge](#-come-funziona-il-merge)
 - [Uso non interattivo](#-uso-non-interattivo)
@@ -110,6 +111,105 @@ installare qualsiasi cosa.
 
 `install-provider` verifica anche l'hash di `install.sh` prima di eseguirlo:
 è codice che sta per girare, non un semplice file da mettere in `/usr/local/bin`.
+
+---
+
+## 🤖 Let your AI set it up
+
+Se usi un assistente di coding (pi, Claude Code, Codex, …) puoi evitare il
+copia-incolla: incolla questo prompt e l'assistente installa e configura il
+provider, **verificando il download prima di eseguirlo**.
+
+<details open>
+<summary><b>Prompt pronto da usare</b></summary>
+
+```text
+Installa pi-configurator e configura il provider su questo host.
+
+Prima di tutto leggi README.md e la sezione "Uso non interattivo": i nomi dei
+flag e le procedure sono definiti li', non improvvisarli.
+
+Procedura, senza deviazioni:
+
+1. Scarica install-provider.sh dal TAG v0.3.1, mai da main, in una directory
+   temporanea. Pinna il tag: main puo' cambiare in qualsiasi momento.
+2. Verifica lo SHA256 del file scaricato confrontandolo con la voce in
+   SHA256SUMS scaricata dallo STESSO ref (v0.3.1), non da main. Se non
+   corrisponde, FERMATI e segnalalo. Non usare --no-verify e non eseguire
+   un file non verificato.
+3. Chiedimi solo cio' che non puoi dedurre: endpoint, model id, e il nome della
+   variabile d'ambiente che contiene la API key. Non chiedermi la chiave in
+   chiaro.
+4. Esegui l'installer con:
+       --ref v0.3.1
+       --endpoint <endpoint>
+       --api anthropic
+       --model <model-id>
+       --key-env <NOME_VARIABLE>
+   Non usare MAI --key: con --key-env lo script scrive
+   "apiKey": "$<NOME_VARIABLE>" e pi la risolve dall'ambiente a ogni richiesta,
+   quindi la credenziale non finisce mai su disco in chiaro.
+5. Verifica con:  pi auth check --provider <nome-profilo> --json
+6. Mostrami il models.json risultante con la apiKey mascherata.
+
+Vincoli: non modificare ~/.pi/agent/settings.json se non te lo chiedo
+esplicitamente. Se jq manca, installalo o fermati e dimmelo, non aggirarlo.
+Prima di scrivere models.json, ricorda che ne viene creato un backup in
+models.json.bak: se il file esiste gia' e contiene altri provider, non deve
+perderne nessuno.
+```
+
+</details>
+
+Lo stesso prompt, in inglese, per chi preferisce dare gli ordini al
+rispettivo assistente nella lingua del prompt:
+
+<details>
+<summary><b>Same prompt, in English</b></summary>
+
+```text
+Install pi-configurator and configure the provider on this host.
+
+First read README.md and the "Non-interactive use" section: flag names and
+procedures are defined there, do not improvise them.
+
+Procedure, with no deviations:
+
+1. Download install-provider.sh from the TAG v0.3.1, never from main, into a
+   temporary directory. Pin the tag: main can change at any moment.
+2. Verify the SHA256 of the downloaded file against the entry in SHA256SUMS
+   fetched from the SAME ref (v0.3.1), not from main. If it does not match,
+   STOP and report it. Do not use --no-verify, and never run a file you have
+   not verified.
+3. Ask me only for what you cannot infer: endpoint, model id, and the name of
+   the environment variable holding the API key. Do not ask me for the key in
+   clear.
+4. Run the installer with:
+       --ref v0.3.1
+       --endpoint <endpoint>
+       --api anthropic
+       --model <model-id>
+       --key-env <VAR_NAME>
+   Never use --key: with --key-env the script writes
+   "apiKey": "$<VAR_NAME>" and pi resolves it from the environment on every
+   request, so the credential never lands on disk in clear.
+5. Verify with:  pi auth check --provider <profile-name> --json
+6. Show me the resulting models.json with the apiKey masked.
+
+Constraints: do not modify ~/.pi/agent/settings.json unless I explicitly ask.
+If jq is missing, install it or stop and tell me; do not work around it.
+Before writing models.json, remember a backup is created at
+models.json.bak: if the file already exists and holds other providers, none
+of them may be lost.
+```
+
+</details>
+
+> [!NOTE]
+> Il prompt è scritto per essere **incollato così com'è**. Se lo modifichi,
+> conserva i tre vincoli che lo rendono sicuro: verifica SHA256 prima di
+> eseguire, `--key-env` al posto di `--key`, e nessuna modifica a
+> `settings.json` senza richiesta esplicita.
 
 ---
 
