@@ -209,6 +209,109 @@ if grep -q 'function Save-ConfigBackup' "$CONF_PS1"; then ok "helper Save-Config
 else fail "helper Save-ConfigBackup presente" "function Save-ConfigBackup" "assente"; fi
 echo
 
+# --- §10 non-interactive mode: the one-line installer's entry point ---------
+echo "§10 modalità non interattiva (add)"
+
+# run_args <target models.json> <args...> — no stdin at all
+run_args() {
+    local target="$1"; shift
+    PI_CONF_FILE="$target" bash "$CONF_SH" "$@" < /dev/null > "$WORK/out" 2>&1
+}
+
+F="$WORK/s10.json"
+run_args "$F" add \
+    --endpoint https://api.server.example --api anthropic \
+    --model MLR-3 --profile cfg1 --key-env MLR_KEY \
+    --reasoning --context 512000 --max-tokens 32768 --yes
+assert_jq "endpoint scritto"                   "$F" '.providers.cfg1.baseUrl' 'https://api.server.example'
+assert_jq "api mappata"                        "$F" '.providers.cfg1.api' 'anthropic-messages'
+assert_jq "apiKey per env var (NON in chiaro)" "$F" '.providers.cfg1.apiKey' '$MLR_KEY'
+assert_jq "reasoning applicato"                "$F" '.providers.cfg1.models[0].reasoning' 'true'
+assert_jq "context applicato"                  "$F" '.providers.cfg1.models[0].contextWindow' '512000'
+assert_jq "max tokens applicato"               "$F" '.providers.cfg1.models[0].maxTokens' '32768'
+
+F="$WORK/s10b.json"
+run_args "$F" add --endpoint https://api.server.example --api openai \
+    --model gpt-x --key-env K --no-reasoning --yes
+assert_jq "no-reasoning applicato"             "$F" '.providers["gpt-x"].models[0].reasoning' 'false'
+assert_jq "default profile = model sanitizzato" "$F" '.providers["gpt-x"].models[0].id' 'gpt-x'
+assert_jq "api openai mappata"                 "$F" '.providers["gpt-x"].api' 'openai-completions'
+
+# defaults: no --context/--max-tokens given
+F="$WORK/s10c.json"
+run_args "$F" add --endpoint https://api.server.example --api anthropic \
+    --model MLR-3 --key-env K --yes
+assert_jq "context di default"                 "$F" '.providers["mlr-3"].models[0].contextWindow' '512000'
+assert_jq "max tokens di default"              "$F" '.providers["mlr-3"].models[0].maxTokens' '32768'
+
+# bare flags without the `add` subcommand
+F="$WORK/s10d.json"
+run_args "$F" --endpoint https://api.server.example --api anthropic \
+    --model MLR-3 --key-env K --yes
+assert_jq "flag senza 'add' funzionano"        "$F" '.providers["mlr-3"].baseUrl' 'https://api.server.example'
+
+# --dry-run must not write
+F="$WORK/s10e.json"
+run_args "$F" add --endpoint https://api.server.example --api anthropic \
+    --model MLR-3 --key-env K --dry-run
+[ -f "$F" ] && fail "--dry-run non scrive" "file assente" "file creato" || ok "--dry-run non scrive"
+
+# --print-config emits valid JSON on stdout
+F="$WORK/s10f.json"
+run_args "$F" add --endpoint https://api.server.example --api anthropic \
+    --model MLR-3 --profile pc --key-env K --print-config
+jq -e '.providers.pc.apiKey' "$WORK/out" >/dev/null 2>&1 \
+    && ok "--print-config emette JSON valido" || fail "--print-config emette JSON valido" "JSON con providers.pc" "output non parsabile: $(head -3 "$WORK/out")"
+
+# missing required arguments must fail loudly, not silently
+F="$WORK/s10g.json"
+run_args "$F" add --api anthropic --model MLR-3 --yes
+[ -f "$F" ] && fail "manca --endpoint => nessuna scrittura" "file assente" "file creato" \
+              || ok "manca --endpoint => nessuna scrittura"
+grep -qi "endpoint" "$WORK/out" && ok "messaggio d'errore utile" || fail "messaggio d'errore utile" "menziona endpoint" "$(head -2 "$WORK/out")"
+
+# non-interactive mode must not destroy an existing provider
+F="$WORK/s10h.json"
+seed "$F"
+run_args "$F" add --endpoint https://api.server.example --api anthropic \
+    --model MLR-3 --profile MLR-3 --key-env MLR_KEY --yes
+assert_jq "apiKey aggiornata a env var"         "$F" '.providers["MLR-3"].apiKey' '$MLR_KEY'
+assert_jq "promptCache conservato"              "$F" '.providers["MLR-3"].models[0].promptCache.short' '200000'
+assert_jq "modello extra conservato"            "$F" '[.providers["MLR-3"].models[].id] | index("MLR-3-mini") != null' 'true'
+[ -f "$F.bak" ] && ok "backup creato in add" || fail "backup creato in add" "$F.bak" "assente"
+
+echo
+
+# --- §11 sanitize_name: no trailing dash, no non-ASCII ----------------------
+# Regressione: `echo` aggiunge un newline che `tr -cs` convertiva in "-", e
+# `sed 's/^-\|-$//g'` su BSD sed non e' alternanza, quindi il trattino restava.
+# Ogni profilo di default ne ereditava uno ("mlr-3-", "gpt-x-").
+echo "§11 sanitize_name"
+# estraiamo la funzione dal sorgente senza eseguire main()
+sed -n '/^sanitize_name()/,/^}/p' "$CONF_SH" > "$WORK/sn.sh"
+sn() { ( . "$WORK/sn.sh"; sanitize_name "$1" ) 2>/dev/null; }
+assert_eq_str() {
+    local name="$1" actual; actual="$(sn "$2")"
+    [[ "$actual" == "$3" ]] && ok "$name" || fail "$name" "$3" "${actual:-<vuoto>}"
+}
+assert_eq_str "gpt-x senza trattino finale"  "gpt-x"             "gpt-x"
+assert_eq_str "MLR-3 minuscolo"             "MLR-3"             "mlr-3"
+assert_eq_str "claude-sonnet-4-5 intatto"   "claude-sonnet-4-5" "claude-sonnet-4-5"
+assert_eq_str "accento espulso, no trattino" "MLR-3é"            "mlr-3"
+assert_eq_str "underscore -> trattino"       "a_b"               "a-b"
+assert_eq_str "spazi -> trattini"            "a b"               "a-b"
+assert_eq_str "vuoto -> stringa vuota"       "..."               ""
+
+# il risultato deve sempre superare la validazione del profilo
+for s in "gpt-x" "MLR-3" "MLR-3é" "claude sonnet 4.5" "a_b"; do
+    r="$(sn "$s")"
+    [[ -z "$r" || "$r" =~ ^[a-zA-Z0-9_-]+$ ]] \
+        && ok "sanitize('$s') = '${r:-<vuoto>}' supera la validazione" \
+        || fail "sanitize('$s') = '$r' supera la validazione" "solo [a-zA-Z0-9_-]" "$r"
+done
+
+echo
+
 # --- summary ----------------------------------------------------------------
 echo "--------------------------------------------"
 printf 'passati: %d   falliti: %d\n' "$PASS" "$FAIL"
