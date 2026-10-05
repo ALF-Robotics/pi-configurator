@@ -35,6 +35,10 @@ Prima di ogni scrittura viene creato un backup in `models.json.bak`.
 
 ## Installa
 
+Ci sono due installer, con scopi diversi.
+
+**Solo il tool**, se poi lo usi a mano o in interattivo:
+
 ```bash
 # macOS / Linux
 curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh | sh
@@ -45,19 +49,46 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/i
 irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex
 ```
 
+**Tool e provider insieme**, per il provisioning. I parametri del provider sono
+flag di primo livello, senza separatori:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.sh \
+  | sh -s -- \
+      --endpoint https://api.server.example \
+      --api anthropic \
+      --model MLR-3 \
+      --key-env MLR_API_KEY
+```
+
+```powershell
+irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1 | iex -args @(
+    '-Endpoint','https://api.server.example',
+    '-Api','anthropic',
+    '-Model','MLR-3',
+    '-KeyEnv','MLR_API_KEY'
+)
+```
+
 Installa in `~/.local/bin` (Windows: `%USERPROFILE%\.pi-configurator`) e verifica
 ogni file scaricato con lo SHA256 prima di scrivere: se l'hash non corrisponde
-l'installazione si ferma senza toccare nulla.
+l'installazione si ferma senza toccare nulla. `install-provider.sh` verifica
+anche l'hash di `install.sh` prima di eseguirlo, perché è codice che sta per
+girare.
 
 **Pinna la versione.** `main` può cambiare in qualsiasi momento; un tag no:
 
 ```bash
-curl -fsSL .../main/install.sh | sh -s -- --ref v0.2.0
+curl -fsSL .../main/install.sh | sh -s -- --ref v0.3.0
 ```
 
-Opzioni dell'installer: `--ref`, `--prefix`, `--dry-run`, `--no-verify`, e `--`
-seguito dagli argomenti da passare a `pi-conf.sh` per installare e configurare
-nella stessa invocazione.
+Opzioni di `install.sh`: `--ref`, `--prefix`, `--dry-run`, `--no-verify`, e `--`
+seguito dagli argomenti da passare a `pi-conf.sh`.
+
+`install-provider.sh` accetta le stesse opzioni di installazione **più** i flag
+del provider (`--endpoint`, `--model`, `--key-env`, …): non serve il `--`, e
+un `--endpoint` o `--model` mancante viene respinto **prima** di installare
+qualsiasi cosa.
 
 ## File
 
@@ -67,6 +98,8 @@ nella stessa invocazione.
 | `pi-conf.ps1` | Windows | PowerShell 5.1 (default Win10/11) o pwsh 7+ |
 | `install.sh` | macOS / Linux | POSIX sh, senza dipendenze oltre `curl`/`wget` |
 | `install.ps1` | Windows | PowerShell 5.1 o pwsh 7+ |
+| `install-provider.sh` | macOS / Linux | POSIX sh, installa e configura |
+| `install-provider.ps1` | Windows | PowerShell 5.1 o pwsh 7+ |
 | `site/index.html` | — | pagina di supporto, autoportante |
 | `tests/pi-conf-test.sh` | macOS / Linux | suite di test |
 
@@ -269,38 +302,38 @@ Prima di scrivere, il file corrente viene copiato in `models.json.bak`.
 bash tests/pi-conf-test.sh
 ```
 
-90 asserzioni in 13 sezioni. Coprono merge non distruttivo, backup, mascheramento
-in anteprima, permessi del file, modalità non interattiva, `sanitize_name`,
-l'installer e una guardia che verifica che la suite non abbia mai toccato il
+116 asserzioni in 14 sezioni. Coprono merge non distruttivo, backup, mascheramento
+in anteprima, permessi del file, modalità non interattiva, `sanitize_name`, i due
+installer e una guardia che verifica che la suite non abbia mai toccato il
 `models.json` reale.
 
-`pi-conf.sh` e `install.sh` sono coperti **eseguendoli**; `pi-conf.ps1` e
-`install.ps1` sono presi in carico solo da controlli statici, perché `pwsh` non
-è necessario per eseguire la suite.
+`pi-conf.sh`, `install.sh` e `install-provider.sh` sono coperti **eseguendoli**;
+i tre file PowerShell sono presi in carico solo da controlli statici, perché
+`pwsh` non è necessario per eseguire la suite.
 
 La suite è stata verificata per sabotaggio: disattivando la verifica SHA256
-dell'installer, il ritaglio del trattino in `sanitize_name` o la scrittura di
-`--key-env` come riferimento env, la suite fallisce in tutti e tre i casi.
+dell'installer, il ritaglio del trattino in `sanitize_name`, la scrittura di
+`--key-env` come riferimento env o il controllo anticipato su `--model`, la
+suite fallisce in tutti e quattro i casi.
 
 ## Limiti noti
 
-- **`pi-conf.ps1` e `install.ps1` non sono mai stati eseguiti.** La copertura
-  è statica (grafi bilanciati, presenza dei marker, coerenza dei default fra le
-  due implementazioni). La logica PowerShell va verificata su Windows.
-- **L'installer non è mai stato provato contro GitHub.** I test lo esercitano da
-  checkout locale, che è un percorso diverso dal download via rete. La
-  verifica SHA256 è provata alterando un file in locale, non simulatingando un
-  scaricamento corrotto.
-- **Il repo è privato**, quindi la riga di installazione con
-  `raw.githubusercontent.com` funziona solo se il repo diventa pubblico. Con il
-  repo privato serve `git clone` o autenticazione.
-- **La verifica finale è attendibile solo sul config di default.** Con
-  `PI_CONF_FILE` o `PI_CODING_AGENT_DIR` impostati, `pi auth check` legge la
+- **Nessuno dei file PowerShell è mai stato eseguito.** `pi-conf.ps1`,
+  `install.ps1` e `install-provider.ps1` hanno copertura solo statica (grafi
+  bilanciati, presenza dei marker, coerenza dei default fra le due
+  implementazioni). La logica va verificata su Windows.
+- **Gli installer non sono mai stati provati in un test automatico contro
+  GitHub.** I test li esercitano da checkout locale, che è un percorso diverso
+  dal download via rete. La riga `curl … | sh` è stata eseguita a mano e ha
+  funzionato, scaricando dal tag e passando la verifica SHA256, ma non è
+  ripetibile.
+- **La verifica finale di `pi-conf` è attendibile solo sul config di default.**
+  Con `PI_CONF_FILE` o `PI_CODING_AGENT_DIR` impostati, `pi auth check` legge la
   configurazione di pi e non il file appena scritto.
-- **Le due implementazioni non sono identiche.** `PI_BIN` ha la precedenza in
-  PowerShell, in bash viene usato solo se `pi` non è in PATH. La gestione del
-  file non leggibile ora è allineata (entrambe abortiscono senza scrivere),
-  ma il resto non è coperto da test.
+- **Le due implementazioni di pi-conf non sono identiche.** `PI_BIN` ha la
+  precedenza in PowerShell, in bash viene usato solo se `pi` non è in PATH. La
+  gestione del file non leggibile ora è allineata (entrambe abortiscono senza
+  scrivere), ma il resto non è coperto da test.
 - **Nessun backup quando il file non esiste**: sul primo salvataggio non c'è
   nulla da conservare. E il backup viene sovrascritto a ogni esecuzione.
 - **`cost` resta a zero** finché non lo editi a mano, e `input: ["text"]` è
