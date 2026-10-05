@@ -324,7 +324,7 @@ Entrambi richiedono ovviamente `pi` installato e un `~/.pi/agent/` scrivibile.
 | `install.ps1` | Windows | PowerShell 5.1 o pwsh 7+ |
 | `install-provider.sh` | macOS / Linux | POSIX sh, installa e configura |
 | `install-provider.ps1` | Windows | PowerShell 5.1 o pwsh 7+ |
-| `site/index.html` | — | pagina di supporto, autoportante |
+| `docs/index.html` | — | pagina di supporto, autoportante |
 | `tests/pi-conf-test.sh` | macOS / Linux | suite di test |
 
 ---
