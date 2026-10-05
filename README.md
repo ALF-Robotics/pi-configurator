@@ -13,6 +13,7 @@
 [![last-commit](https://img.shields.io/github/last-commit/ALF-Robotics/pi-configurator?style=flat)](https://github.com/ALF-Robotics/pi-configurator/commits/main)
 [![stars](https://img.shields.io/github/stars/ALF-Robotics/pi-configurator?style=flat&label=stars)](https://github.com/ALF-Robotics/pi-configurator/stargazers)
 [![EULA](https://img.shields.io/badge/EULA-v1.1-informational)](EULA.md)
+[![EULA-en](https://img.shields.io/badge/EULA-EN-informational)](EULA.en.md)
 [![type](https://img.shields.io/badge/type-utility-blueviolet)](#-cosa-fa)
 [![target](https://img.shields.io/badge/target-pi%20%28pi--coding--agent%29-ff69d4)](https://pi.dev/)
 [![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#-file)
@@ -32,7 +33,8 @@
 > Il codice è sotto licenza [MIT](LICENSE). L'uso dello script come strumento
 > operativo — incluse le credenziali che vi vengono affidate — è disciplinato
 > dalle condizioni dell'[EULA](EULA.md) v1.1, che **coesiste** con la MIT e non la
-> sostituisce.
+> sostituisce. Il testo italiano fa prevalere in caso di divergenza; ne esiste una
+> [traduzione inglese](EULA.en.md) priva di autonoma efficacia giuridica.
 
 ## 📋 Indice
 
@@ -389,7 +391,7 @@ guardia `has("apiKey")`, la suite **fallisce** in tutti e cinque i casi.
 
 <div align="center">
 
-**MIT** · [EULA v1.1](EULA.md) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases)
+**MIT** · [EULA v1.1](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases)
 
 <sub>🇮🇹 <b>Italiano</b> · 🇬🇧 <a href="README.en.md">English</a></sub>
 

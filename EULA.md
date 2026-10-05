@@ -2,6 +2,13 @@
 
 **Versione 1.1 — 2026-10-04**
 
+> 🇮🇹 **Italiano** · 🇬🇧 [English](EULA.en.md)
+
+> **Testo autorevole.** Questo documento in lingua italiana fa prevalere in caso
+> di divergenza interpretativa (vedi § 12). La versione inglese è una traduzione
+> di cortesia, priva di autonoma efficacia giuridica, e può divergere solo per
+> imprecisione di traduzione.
+
 > **1.0 → 1.1**: § 5 e § 6 aggiornati dopo la risoluzione delle issue #1 e #2
 > (merge non distruttivo, backup automatico, mascheramento della chiave in
 > anteprima, allineamento delle due implementazioni sul file non leggibile).
@@ -261,7 +268,9 @@ quelle relative a § 9 e § 10 — richiedono una nuova accettazione esplicita.
 ## 14. Documenti collegati
 
 - [`LICENSE`](LICENSE) — licenza MIT del codice sorgente
+- [`EULA.en.md`](EULA.en.md) — le presenti condizioni in inglese (traduzione)
 - [`README.md`](README.md) — funzionamento, dipendenze e limiti noti
+- [`README.en.md`](README.en.md) — funzionamento, dipendenze e limiti noti (inglese)
 - [`tests/pi-conf-test.sh`](tests/pi-conf-test.sh) — suite comportamentale
 - Issue [#1](https://github.com/ALF-Robotics/pi-configurator/issues/1) — sovrascrittura del provider, **risolta** (cfr. § 6.1)
 - Issue [#2](https://github.com/ALF-Robotics/pi-configurator/issues/2) — chiave in chiaro nell'anteprima, **risolta** (cfr. § 5)
