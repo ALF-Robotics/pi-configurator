@@ -35,6 +35,18 @@ printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_DIR/pi"
 chmod +x "$STUB_DIR/pi"
 export PATH="$STUB_DIR:$PATH"
 
+# Firma della configurazione reale di pi, per verificare a fine suite che nessun
+# test l'ha toccata. Senza questa guardia un test che dimentica PI_CONF_FILE
+# scrive sul models.json dell'utente e fallisce in silenzio: e' successo.
+REAL_CONF="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/models.json"
+conf_sig() {
+    if [ -f "$REAL_CONF" ]; then
+        if command -v sha256sum >/dev/null 2>&1; then sha256sum "$REAL_CONF" | cut -d' ' -f1
+        else shasum -a 256 "$REAL_CONF" | cut -d' ' -f1; fi
+    else printf 'assente'; fi
+}
+REAL_CONF_BEFORE="$(conf_sig)"
+
 ok()   { PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; }
 fail() {
     FAIL=$((FAIL+1))
@@ -198,6 +210,22 @@ echo
 
 # --- §9 static tripwires for pi-conf.ps1 (not executed here) ----------------
 echo "§9 controlli statici su pi-conf.ps1 (non eseguito)"
+INSTALL_PS1="$REPO_DIR/install.ps1"
+if [ -f "$INSTALL_PS1" ]; then
+    nb_o=$(grep -o '{' "$INSTALL_PS1" | wc -l | tr -d ' ')
+    nb_c=$(grep -o '}' "$INSTALL_PS1" | wc -l | tr -d ' ')
+    [[ "$nb_o" == "$nb_c" ]] && ok "install.ps1: graffe bilanciate ($nb_o)" \
+        || fail "install.ps1: graffe bilanciate" "$nb_o" "$nb_c"
+    for needle in 'Invoke-WebRequest' 'Get-FileHash' 'SHA256SUMS' 'ValueFromRemainingArguments' 'Passthrough'; do
+        grep -q "$needle" "$INSTALL_PS1" && ok "install.ps1 contiene $needle" \
+            || fail "install.ps1 contiene $needle" "$needle" "assente"
+    done
+    # Windows PowerShell 5.1 lo richiede esplicitamente
+    grep -q -- '-UseBasicParsing' "$INSTALL_PS1" && ok "install.ps1 usa -UseBasicParsing (PS 5.1)" \
+        || fail "install.ps1 usa -UseBasicParsing (PS 5.1)" "-UseBasicParsing" "assente"
+else
+    echo "  (install.ps1 assente)"
+fi
 if grep -q 'providers\.\$ProfileName = \$providerObj' "$CONF_PS1"; then
     fail "sovrascrittura grezza rimossa" "assente" "presente: providers.\$ProfileName = \$providerObj"
 else ok "sovrascrittura grezza rimossa"; fi
@@ -341,6 +369,102 @@ for s in "gpt-x" "MLR-3" "MLR-3é" "claude sonnet 4.5" "a_b"; do
         || fail "sanitize('$s') = '$r' supera la validazione" "solo [a-zA-Z0-9_-]" "$r"
 done
 
+echo
+
+# --- §12 installer: install.sh ----------------------------------------------
+# L'installer e' la via con cui si installa il tool su un host remoto, quindi
+# viene testato come comportamento: cosa scrive, dove, e cosa rifiuta.
+echo "§12 install.sh"
+INSTALL_SH="$REPO_DIR/install.sh"
+SUMS="$REPO_DIR/SHA256SUMS"
+
+if [ ! -f "$INSTALL_SH" ]; then
+    echo "  (install.sh assente, sezione saltata)"
+else
+    sh -n "$INSTALL_SH" && ok "sintassi POSIX sh valida" \
+        || fail "sintassi POSIX sh valida" "sh -n pulito" "sh -n ha fallito"
+
+    # lo script viene eseguito da /bin/sh: nessun costrutto solo-bash
+    if grep -nE '\[\[|^[[:space:]]*local[[:space:]]|<<<|\$\{!|\+=|[[:space:]]&>|\|&|\bsource\b' \
+        "$INSTALL_SH" > "$WORK/bashisms" 2>/dev/null; then
+        fail "nessun costrutto bash-only" "sh compatibile" "$(head -2 "$WORK/bashisms")"
+    else ok "nessun costrutto bash-only"; fi
+
+    [ -x "$INSTALL_SH" ] && ok "install.sh eseguibile nel repo" \
+        || fail "install.sh eseguibile nel repo" "bit x" "manca il bit x"
+
+    "$INSTALL_SH" --help > "$WORK/out" 2>&1
+    [ $? -eq 0 ] && grep -qi "curl" "$WORK/out" && ok "--help mostra la riga di installazione" \
+        || fail "--help mostra la riga di installazione" "exit 0 con esempio curl" "exit $?"
+
+    "$INSTALL_SH" --argomento-inesistente > "$WORK/out" 2>&1
+    [ $? -ne 0 ] && ok "argomento ignoto rifiutato" || fail "argomento ignoto rifiutato" "exit != 0" "exit 0"
+
+    # --dry-run non deve scrivere nulla
+    D="$(mktemp -d)/prefix"
+    ( cd "$REPO_DIR" && sh install.sh --prefix "$D" --dry-run ) > "$WORK/out" 2>&1
+    [ -e "$D/pi-conf.sh" ] && fail "--dry-run non scrive" "prefix vuota" "file creato" \
+        || ok "--dry-run non scrive"
+
+    # installazione reale da checkout locale
+    D="$(mktemp -d)/prefix"
+    ( cd "$REPO_DIR" && sh install.sh --prefix "$D" ) > "$WORK/out" 2>&1
+    [ -f "$D/pi-conf.sh" ] && ok "installa pi-conf.sh" || fail "installa pi-conf.sh" "$D/pi-conf.sh" "assente"
+    [ -f "$D/pi-conf.ps1" ] && ok "installa pi-conf.ps1" || fail "installa pi-conf.ps1" "$D/pi-conf.ps1" "assente"
+    [ -x "$D/pi-conf.sh" ] && ok "pi-conf.sh eseguibile" || fail "pi-conf.sh eseguibile" "bit x" "non eseguibile"
+
+    # lo script installato deve funzionare: prova che i due percorsi concordino
+    F="$WORK/s12-installed.json"
+    if PI_CONF_FILE="$F" "$D/pi-conf.sh" add --endpoint https://api.server.example \
+        --api anthropic --model MLR-3 --key-env K --yes >/dev/null 2>&1 \
+        && [ "$(jq -r '.providers["mlr-3"].apiKey' "$F" 2>/dev/null)" = '$K' ]; then
+        ok "lo script installato funziona"
+    else fail "lo script installato funziona" "apiKey \$K" "vedi $WORK/out"; fi
+
+    # checksum alterato => l'installer deve rifiutarsi
+    if [ -f "$SUMS" ]; then
+        SRC="$(mktemp -d)"
+        cp "$REPO_DIR/install.sh" "$REPO_DIR/pi-conf.sh" "$REPO_DIR/pi-conf.ps1" "$SUMS" "$SRC/"
+        printf '\n# alterato per il test\n' >> "$SRC/pi-conf.sh"
+        D="$(mktemp -d)/prefix"
+        ( cd "$SRC" && sh install.sh --prefix "$D" ) > "$WORK/out" 2>&1
+        if [ $? -ne 0 ] && grep -qi "checksum" "$WORK/out"; then
+            ok "checksum alterato => installazione rifiutata"
+        else fail "checksum alterato => installazione rifiutata" "exit != 0 con messaggio checksum" "$(head -2 "$WORK/out")"; fi
+        [ -e "$D/pi-conf.sh" ] && fail "niente installato dopo il rifiuto" "prefix vuota" "file creato" \
+            || ok "niente installato dopo il rifiuto"
+
+        # --no-verify deve lasciar passare
+        D="$(mktemp -d)/prefix"
+        ( cd "$SRC" && sh install.sh --prefix "$D" --no-verify ) > "$WORK/out" 2>&1
+        [ -f "$D/pi-conf.sh" ] && ok "--no-verify e' un escape hatch" \
+            || fail "--no-verify e' un escape hatch" "installa comunque" "non ha installato"
+    else
+        echo "  (SHA256SUMS assente: verifica non testata)"
+    fi
+
+    # passthrough: installa e configura nella stessa invocazione.
+    # PI_CONF_FILE e' obbligatorio qui: senza, pi-conf.sh scriverebbe sul
+    # models.json reale dell'utente.
+    D="$(mktemp -d)/prefix"
+    F="$WORK/s12-passthrough.json"
+    ( cd "$REPO_DIR" && PI_CONF_FILE="$F" sh install.sh --prefix "$D" -- \
+        --endpoint https://api.server.example --api anthropic \
+        --model MLR-3 --key-env MLR_KEY --yes ) > "$WORK/out" 2>&1
+    assert_jq "passthrough configura il provider" "$F" '.providers["mlr-3"].apiKey' '$MLR_KEY'
+fi
+
+echo
+
+# --- guardia finale: la configurazione reale non deve essere cambiata -------
+echo "§13 guardia configurazione reale"
+REAL_CONF_AFTER="$(conf_sig)"
+if [[ "$REAL_CONF_BEFORE" == "$REAL_CONF_AFTER" ]]; then
+    ok "la configurazione reale non e' stata toccata ($REAL_CONF)"
+else
+    fail "la configurazione reale non e' stata toccata" "invariata" \
+         "MODIFICATA: $REAL_CONF (prima $REAL_CONF_BEFORE, dopo $REAL_CONF_AFTER)"
+fi
 echo
 
 # --- summary ----------------------------------------------------------------
