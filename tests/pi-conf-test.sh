@@ -128,6 +128,12 @@ echo "§2 nuovo provider senza api key"
 F="$WORK/s2.json"
 run_conf "$F" 'https://api.server.example\nanthropic\nMLR-3\nnokey\n\ny\n\n\ny\n'
 assert_jq "apiKey assente quando omessa"         "$F" '.providers.nokey | has("apiKey")' 'false'
+# l'anteprima non deve inventare il campo: jq |= su una chiave assente la crea
+# con null, e l'utente vedrebbe un apiKey che nel file non c'e'
+if grep -q '"apiKey": null' "$WORK/out"; then
+    fail "anteprima senza apiKey non mostra il campo" "nessun apiKey nell'anteprima" \
+         "$(grep -m1 '"apiKey"' "$WORK/out")"
+else ok "anteprima senza apiKey non mostra il campo"; fi
 echo
 
 # --- §3 THE CORE OF ISSUE #1: re-run must not destroy -----------------------
