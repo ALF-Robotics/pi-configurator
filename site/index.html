@@ -124,14 +124,40 @@
     </p>
   </div>
 
-  <p class="lede" style="margin-top:16px">
-    Oppure installa e configura nella stessa invocazione:
+  <h2>Installa e configura in un colpo</h2>
+  <p class="lede">
+    Per il provisioning c'è uno script dedicato: i parametri del provider sono
+    flag di primo livello, senza separatori da ricordare.
   </p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true"  data-t="p-unix">macOS / Linux</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="p-win">Windows</button>
+  </div>
+
   <div class="panel">
-    <pre><button class="copy" data-c="both">copia</button><code>curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh \
-  | sh -s -- --ref v0.2.0 -- \
-      --endpoint https://api.server.example --api anthropic \
-      --model MLR-3 --key-env MLR_API_KEY</code></pre>
+    <div id="p-unix">
+      <pre><button class="copy" data-c="prov">copia</button><code>curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.sh \
+  | sh -s -- \
+      --endpoint https://api.server.example \
+      --api anthropic \
+      --model MLR-3 \
+      --key-env MLR_API_KEY</code></pre>
+    </div>
+    <div id="p-win" hidden>
+      <pre><button class="copy" data-c="provw">copia</button><code>irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1 | iex -args @(
+    '-Endpoint','https://api.server.example',
+    '-Api','anthropic',
+    '-Model','MLR-3',
+    '-KeyEnv','MLR_API_KEY'
+)</code></pre>
+    </div>
+  </div>
+
+  <div class="note ok">
+    Se manca <code>--endpoint</code> o <code>--model</code> lo script si ferma
+    <em>prima</em> di installare qualsiasi cosa, e verifica con SHA256
+    l'installer che sta per eseguire.
   </div>
 
   <h2>Cosa garantisce</h2>
@@ -199,12 +225,17 @@
 </div>
 
 <script>
-document.querySelectorAll('.tab').forEach(function (t) {
-  t.addEventListener('click', function () {
-    document.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-selected', 'false'); });
-    document.querySelectorAll('.panel > div').forEach(function (d) { d.hidden = true; });
-    t.setAttribute('aria-selected', 'true');
-    document.getElementById(t.dataset.t).hidden = false;
+// Ogni gruppo .tabs governa solo il .panel che lo segue.
+document.querySelectorAll('.tabs').forEach(function (group) {
+  var panel = group.nextElementSibling;
+  if (!panel) return;
+  group.querySelectorAll('.tab').forEach(function (t) {
+    t.addEventListener('click', function () {
+      group.querySelectorAll('.tab').forEach(function (x) { x.setAttribute('aria-selected', 'false'); });
+      panel.querySelectorAll(':scope > div').forEach(function (d) { d.hidden = true; });
+      t.setAttribute('aria-selected', 'true');
+      panel.querySelector('#' + t.dataset.t).hidden = false;
+    });
   });
 });
 document.querySelectorAll('.copy').forEach(function (b) {

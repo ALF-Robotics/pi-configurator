@@ -211,6 +211,25 @@ echo
 # --- §9 static tripwires for pi-conf.ps1 (not executed here) ----------------
 echo "§9 controlli statici su pi-conf.ps1 (non eseguito)"
 INSTALL_PS1="$REPO_DIR/install.ps1"
+IP_PS1="$REPO_DIR/install-provider.ps1"
+if [ -f "$IP_PS1" ]; then
+    nb_o=$(grep -o '{' "$IP_PS1" | wc -l | tr -d ' ')
+    nb_c=$(grep -o '}' "$IP_PS1" | wc -l | tr -d ' ')
+    [[ "$nb_o" == "$nb_c" ]] && ok "install-provider.ps1: graffe bilanciate ($nb_o)" \
+        || fail "install-provider.ps1: graffe bilanciate" "$nb_o" "$nb_c"
+    # Nota: qui NON si usa ValueFromRemainingArguments, perche' i parametri del
+    # provider sono parametri PowerShell espliciti (-Endpoint, -Model, ...).
+    for needle in 'Invoke-WebRequest' 'Get-FileHash' 'providerArgs' 'KeyEnv' 'NoReasoning'; do
+        grep -q "$needle" "$IP_PS1" && ok "install-provider.ps1 contiene $needle" \
+            || fail "install-provider.ps1 contiene $needle" "$needle" "assente"
+    done
+    # non deve chiedere il separatore '--': usa parametri PowerShell
+    if grep -q "argomenti da passare a pi-conf.ps1" "$IP_PS1"; then
+        fail "nessun separatore -- richiesto" "parametri di primo livello" "lo chiede ancora"
+    else ok "nessun separatore -- richiesto"; fi
+else
+    fail "install-provider.ps1 esiste" "$IP_PS1" "assente"
+fi
 if [ -f "$INSTALL_PS1" ]; then
     nb_o=$(grep -o '{' "$INSTALL_PS1" | wc -l | tr -d ' ')
     nb_c=$(grep -o '}' "$INSTALL_PS1" | wc -l | tr -d ' ')
@@ -452,6 +471,92 @@ else
         --endpoint https://api.server.example --api anthropic \
         --model MLR-3 --key-env MLR_KEY --yes ) > "$WORK/out" 2>&1
     assert_jq "passthrough configura il provider" "$F" '.providers["mlr-3"].apiKey' '$MLR_KEY'
+fi
+
+echo
+
+# --- §14 install-provider.sh: installa E configura, un solo livello di flag ---
+# Diversamente da install.sh, qui i parametri del provider sono flag di primo
+# livello: niente separatore `--` da ricordare.
+echo "§14 install-provider.sh"
+IP_SH="$REPO_DIR/install-provider.sh"
+if [ ! -f "$IP_SH" ]; then
+    fail "install-provider.sh esiste" "$IP_SH" "assente"
+else
+    sh -n "$IP_SH" && ok "sintassi POSIX sh valida" \
+        || fail "sintassi POSIX sh valida" "sh -n pulito" "sh -n ha fallito"
+    if grep -nE '\[\[|^[[:space:]]*local[[:space:]]|<<<|\$\{!|\+=|[[:space:]]&>|\|\&|\bsource\b' \
+        "$IP_SH" > "$WORK/bashisms2" 2>/dev/null; then
+        fail "nessun costrutto bash-only" "sh compatibile" "$(head -2 "$WORK/bashisms2")"
+    else ok "nessun costrutto bash-only"; fi
+    [ -x "$IP_SH" ] && ok "install-provider.sh eseguibile" \
+        || fail "install-provider.sh eseguibile" "bit x" "manca il bit x"
+
+    # l'help deve mostrare i flag del provider, non un separatore --
+    "$IP_SH" --help > "$WORK/out" 2>&1
+    if grep -q -- '--endpoint' "$WORK/out" && grep -q -- '--key-env' "$WORK/out"; then
+        ok "--help mostra i flag del provider"
+    else fail "--help mostra i flag del provider" "--endpoint e --key-env" "assenti"; fi
+    if grep -q 'argomenti da passare a pi-conf.sh' "$WORK/out"; then
+        fail "nessun separatore -- richiesto" "flag di primo livello" "l'help chiede ancora il separatore"
+    else ok "nessun separatore -- richiesto"; fi
+
+    # dry-run non scrive nulla
+    D="$(mktemp -d)/prefix"
+    F="$WORK/s14-dry.json"
+    ( cd "$REPO_DIR" && PI_CONF_FILE="$F" sh install-provider.sh --prefix "$D" \
+        --endpoint https://api.server.example --model MLR-3 --key-env K --dry-run ) \
+        > "$WORK/out" 2>&1
+    if [ -e "$D/pi-conf.sh" ] || [ -e "$F" ]; then
+        fail "--dry-run non scrive" "niente scritto" "ha scritto $D o $F"
+    else ok "--dry-run non scrive"; fi
+
+    # il caso d'uso: installa e configura con una sola invocazione
+    D="$(mktemp -d)/prefix"
+    F="$WORK/s14-full.json"
+    ( cd "$REPO_DIR" && PI_CONF_FILE="$F" sh install-provider.sh --prefix "$D" \
+        --endpoint https://api.server.example --api anthropic \
+        --model MLR-3 --key-env MLR_KEY --yes ) > "$WORK/out" 2>&1
+    [ -f "$D/pi-conf.sh" ] && ok "installa il tool" || fail "installa il tool" "$D/pi-conf.sh" "assente"
+    assert_jq "configura il provider nella stessa invocazione" "$F" '.providers["mlr-3"].apiKey' '$MLR_KEY'
+    assert_jq "endpoint propagato"                      "$F" '.providers["mlr-3"].baseUrl' 'https://api.server.example'
+
+    # I controlli anticipati servono a non installare nulla e poi fallire: se il
+    # caso venisse respinto solo da pi-conf.sh, l'installazione sarebbe gia'
+    # avvenuta. Il test verifica quindi l'assenza di installazione, non solo
+    # l'exit code.
+    for miss in --endpoint --model; do
+        D="$(mktemp -d)/prefix"
+        F="$WORK/s14-miss$miss.json"
+        if [ "$miss" = "--endpoint" ]; then
+            ( cd "$REPO_DIR" && PI_CONF_FILE="$F" sh install-provider.sh --prefix "$D" \
+                --model MLR-3 --yes ) > "$WORK/out" 2>&1
+        else
+            ( cd "$REPO_DIR" && PI_CONF_FILE="$F" sh install-provider.sh --prefix "$D" \
+                --endpoint https://api.server.example --yes ) > "$WORK/out" 2>&1
+        fi
+        rc=$?
+        name="${miss#--}"
+        if [ $rc -ne 0 ] && [ ! -e "$D/pi-conf.sh" ] && [ ! -e "$F" ]; then
+            ok "manca $name => errore esplicito e nulla installato"
+        else
+            fail "manca $name => errore esplicito e nulla installato" \
+                 "exit != 0, nessun file scritto" \
+                 "exit=$rc, installato=$([ -e "$D/pi-conf.sh" ] && echo si || echo no), config=$([ -e "$F" ] && echo si || echo no)"
+        fi
+    done
+
+    # checksum alterato => rifiuto, anche per lo script delegato
+    SRC="$(mktemp -d)"
+    cp "$REPO_DIR/install-provider.sh" "$REPO_DIR/install.sh" "$REPO_DIR/pi-conf.sh" \
+       "$REPO_DIR/pi-conf.ps1" "$REPO_DIR/SHA256SUMS" "$SRC/" 2>/dev/null
+    printf '\n# alterato\n' >> "$SRC/install.sh"
+    D="$(mktemp -d)/prefix"
+    ( cd "$SRC" && PI_CONF_FILE="$WORK/s14-tamper.json" sh install-provider.sh --prefix "$D" \
+        --endpoint https://api.server.example --model MLR-3 --yes ) > "$WORK/out" 2>&1
+    if [ $? -ne 0 ] && grep -qi "checksum" "$WORK/out"; then
+        ok "installer delegato alterato => rifiutato"
+    else fail "installer delegato alterato => rifiutato" "exit != 0 con checksum" "$(head -3 "$WORK/out")"; fi
 fi
 
 echo
