@@ -12,7 +12,7 @@
 [![tag](https://img.shields.io/github/v/tag/ALF-Robotics/pi-configurator?style=flat&label=release)](https://github.com/ALF-Robotics/pi-configurator/releases)
 [![last-commit](https://img.shields.io/github/last-commit/ALF-Robotics/pi-configurator?style=flat)](https://github.com/ALF-Robotics/pi-configurator/commits/main)
 [![stars](https://img.shields.io/github/stars/ALF-Robotics/pi-configurator?style=flat&label=stars)](https://github.com/ALF-Robotics/pi-configurator/stargazers)
-[![EULA](https://img.shields.io/badge/EULA-v1.1-informational)](EULA.md)
+[![EULA](https://img.shields.io/badge/EULA-v1.2-informational)](EULA.md)
 [![EULA-en](https://img.shields.io/badge/EULA-EN-informational)](EULA.en.md)
 [![type](https://img.shields.io/badge/type-utility-blueviolet)](#-cosa-fa)
 [![target](https://img.shields.io/badge/target-pi%20%28pi--coding--agent%29-ff69d4)](https://pi.dev/)
@@ -148,6 +148,7 @@ Procedura, senza deviazioni:
        --api anthropic
        --model <model-id>
        --key-env <NOME_VARIABLE>
+       --input text,image
    Non usare MAI --key: con --key-env lo script scrive
    "apiKey": "$<NOME_VARIABLE>" e pi la risolve dall'ambiente a ogni richiesta,
    quindi la credenziale non finisce mai su disco in chiaro.
@@ -192,6 +193,7 @@ Procedure, with no deviations:
        --api anthropic
        --model <model-id>
        --key-env <VAR_NAME>
+       --input text,image
    Never use --key: with --key-env the script writes
    "apiKey": "$<VAR_NAME>" and pi resolves it from the environment on every
    request, so the credential never lands on disk in clear.
@@ -224,7 +226,7 @@ profilo esistente **campo per campo** conservando `apiKey`, `promptCache`,
 `headers`, `compat`, `cost` e i modelli aggiuntivi.
 Prima di ogni scrittura viene creato un backup in `models.json.bak`.
 
-### Le 8 domande
+### Le 9 domande
 
 | # | Domanda | Default |
 |---|---|---|
@@ -236,6 +238,7 @@ Prima di ogni scrittura viene creato un backup in `models.json.bak`.
 | 6 | **Reasoning esteso?** | `y` |
 | 7 | **Context window** | `512000` |
 | 8 | **Max output tokens** | `32768` |
+| 9 | **Accetta immagini?** | `y` → `input: ["text", "image"]` |
 
 <details>
 <summary><b>Standard API: come viene tradotto il friendly name</b></summary>
@@ -281,11 +284,12 @@ gestisce restano quelli che avevi:
 |---|---|
 | `apiKey` | se lasci il prompt vuoto, **resta**. Prima veniva cancellata, ed era il caso più comune |
 | `promptCache`, `headers`, `compat`, `cost` | personalizzazioni **conservate** |
+| `input` | conservato se non lo dichiari esplicitamente: un modello multimodale non viene degradato a `["text"]` |
 | Modelli aggiuntivi | uniti per `id`: uno nuovo in coda, un `id` già presente aggiornato **nella sua posizione**, senza riordinare |
 | Provider vicini | **non** vengono toccati |
 
-L'unica cosa che cambia è ciò che hai appena risposto ai prompt 7 e 8
-(`contextWindow`, `maxTokens`) e l'`apiKey` **se e solo se** la digiti.
+L'unica cosa che cambia è ciò che hai appena risposto ai prompt 7, 8 e 9
+(`contextWindow`, `maxTokens`, `input`) e l'`apiKey` **se e solo se** la digiti.
 
 ```json
 {
@@ -297,7 +301,7 @@ L'unica cosa che cambia è ciò che hai appena risposto ai prompt 7 e 8
       "id": "MLR-3",
       "name": "MLR-3",
       "reasoning": true,
-      "input": ["text"],
+      "input": ["text", "image"],
       "contextWindow": 512000,
       "maxTokens": 32768,
       "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
@@ -322,7 +326,7 @@ pi rilegge `models.json` ad ogni `/model` — **nessun restart necessario**.
 
 ## 🤖 Uso non interattivo
 
-Senza `add` gli script fanno le 8 domande. Con `add` (o con i flag da soli, che
+Senza `add` gli script fanno le 9 domande. Con `add` (o con i flag da soli, che
 lo implicano) non fanno domande e sono adatti a **provisioning** e script.
 
 ```bash
@@ -350,6 +354,7 @@ pi-conf.sh add \
 | `--reasoning` / `--no-reasoning` | attivo | |
 | `--context <n>` | `512000` | |
 | `--max-tokens <n>` | `32768` | |
+| `--input <lista>` | `text,image` | solo `text` e `image` (l'unione di pi). **Omesso = non toccare**: conserva l'`input` già presente |
 | `--from-file <json>` | — | riempie i campi mancanti |
 | `--config <path>` | config di pi | dove scrivere |
 | `--dry-run` | — | anteprima, non scrive |
@@ -449,7 +454,7 @@ Entrambi richiedono ovviamente `pi` installato e un `~/.pi/agent/` scrivibile.
 bash tests/pi-conf-test.sh
 ```
 
-**117 asserzioni in 14 sezioni.** Coprono merge non distruttivo, backup,
+**136 asserzioni in 15 sezioni.** Coprono merge non distruttivo, backup,
 mascheramento in anteprima, permessi del file, modalità non interattiva,
 `sanitize_name`, i due installer e una guardia che verifica che la suite non
 abbia mai toccato il `models.json` reale.
@@ -460,8 +465,15 @@ i tre file PowerShell sono presi in carico solo da controlli statici, perché
 
 La suite è stata verificata **per sabotaggio**: disattivando la verifica SHA256
 dell'installer, il ritaglio del trattino in `sanitize_name`, la scrittura di
-`--key-env` come riferimento env, il controllo anticipato su `--model` o la
-guardia `has("apiKey")`, la suite **fallisce** in tutti e cinque i casi.
+`--key-env` come riferimento env, il controllo anticipato su `--model`, la
+guardia `has("apiKey")`, la conservazione di `input` nel merge, il default di
+`input` applicato a forza, la validazione di `--input` o la conservazione di
+`input` in PowerShell, la suite **fallisce** in tutti e nove i casi.
+
+Un sabotaggio ha rivelato un test che passava senza motivo: il percorso
+interattivo scrive **sempre** un `input` esplicito, quindi non arrivava mai a
+coprire la conservazione nel merge. Il test che la copre ora passa per `add`
+senza `--input`, ed è quello che intercetta il sabotaggio.
 
 ---
 
@@ -485,15 +497,14 @@ guardia `has("apiKey")`, la suite **fallisce** in tutti e cinque i casi.
   scrivere), ma il resto non è coperto da test.
 - **Nessun backup quando il file non esiste**: sul primo salvataggio non c'è
   nulla da conservare. E il backup viene sovrascritto a ogni esecuzione.
-- **`cost` resta a zero** finché non lo editi a mano, e `input: ["text"]` è
-  fisso: niente input multimodale.
+- **`cost` resta a zero** finché non lo editi a mano.
 - **Nessuna CI**: la suite passa solo se qualcuno la lancia.
 
 ---
 
 <div align="center">
 
-**MIT** · [EULA v1.1](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
+**MIT** · [EULA v1.2](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <b>Italiano</b> · 🇬🇧 <a href="README.en.md">English</a></sub>
 

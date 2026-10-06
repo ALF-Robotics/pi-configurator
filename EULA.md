@@ -1,6 +1,6 @@
 # EULA — pi-configurator
 
-**Versione 1.1 — 2026-10-04**
+**Versione 1.2 — 2026-10-06**
 
 > 🇮🇹 **Italiano** · 🇬🇧 [English](EULA.en.md)
 
@@ -9,6 +9,13 @@
 > di cortesia, priva di autonoma efficacia giuridica, e può divergere solo per
 > imprecisione di traduzione.
 
+> **1.1 → 1.2**: § 6.6 aggiornato. Il limite «`input: ["text"]` è fisso e non
+> espone l'input multimodale» è stato **risolto**: lo script ora scrive
+> `input: ["text", "image"]` per impostazione predefinita, accetta
+> `--input` per scegliere esplicitamente, e conserva l'`input` già presente
+> quando il flag viene omesso. Modifiche solo restrittive rispetto a 1.1: nessun
+> nuovo limite, nessun cambio a § 9 e § 10.
+>
 > **1.0 → 1.1**: § 5 e § 6 aggiornati dopo la risoluzione delle issue #1 e #2
 > (merge non distruttivo, backup automatico, mascheramento della chiave in
 > anteprima, allineamento delle due implementazioni sul file non leggibile).
@@ -151,9 +158,14 @@ eseguendolo. `pi-conf.ps1` non è coperto da test comportamentali: la sua
 correttezza su Windows **non è verificata automaticamente** e richiede una
 esecuzione manuale.
 
-**6.6 Valori di costo a zero.** I campi `cost` generati sono sempre `0` e non
-rappresentano il prezzo effettivo del provider. `input: ["text"]` è fisso e non
-espone l'input multimodale.
+**6.6 Valori di costo a zero — input multimodale risolto.** I campi `cost`
+generati sono sempre `0` e non rappresentano il prezzo effettivo del provider.
+Riguardo all'input multimodale, il limite è **rimosso dalla 1.2**: lo script
+scrive `input: ["text", "image"]` per impostazione predefinita, il flag
+`--input` consente di scegliere esplicitamente (`--input text` solo testo) e
+l'`input` già presente in un profilo viene conservato quando il flag non viene
+usato. Restano valide le sole modalità ammesse dal tipo di pi, `text` e
+`image`: valori diversi vengono rifiutati prima di scrivere.
 
 Il contraente dichiara di essere stato informato dei limiti sopra elencati e di
 essere consapevole che il backup di cui al § 6.2 è l'unica rete di sicurezza
@@ -277,7 +289,7 @@ quelle relative a § 9 e § 10 — richiedono una nuova accettazione esplicita.
 
 ---
 
-*Documento redatto il 2026-10-04. I segnaposto `<EMAIL>` e `<CITTÀ>` vanno
+*Documento redatto il 2026-10-04, revisione 1.2 del 2026-10-06. I segnaposto `<EMAIL>` e `<CITTÀ>` vanno
 completati prima della diffusione. Prima di utilizzare questo EULA in un
 contesto commerciale o contrattuale è opportuno farlo valutare da un
 professionista abilitato.*

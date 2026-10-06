@@ -41,6 +41,7 @@ Senza argomenti, lo script e' interattivo e chiede in ordine:
   6. Reasoning? (y/N)
   7. Context window (default 512000)
   8. Max output tokens (default 32768)
+  9. Multimodale?         (default: y, il modello accetta immagini)
 
 Scrive/aggiorna: ~/.pi/agent/models.json (merge, mode 0600).
 
@@ -156,12 +157,17 @@ sanitize_name() {
 # Programma jq del merge non distruttivo, condiviso dai due percorsi.
 #  - le chiavi assenti in $p mantengono il valore precedente
 #  - i modelli sono uniti per id, in posizione
+# `input` e `cost` seguono la stessa regola: se il nuovo modello non li
+# dichiara, resta il valore gia' presente nel modello esistente. Senza questo
+# un re-run su un modello configurato a mano come multimodale lo degraderebbe
+# a ["text"], azzerando la capacita' immagine.
 MERGE_PROGRAM='
     .providers[$name] as $old
     | (($old.models // []) | map(select(.id == $p.models[0].id)) | .[0] // {}) as $om
     | ($om
        * ($p.models[0] | .cost = null)
-       * { cost: ($om.cost // { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }) }) as $m
+       * { cost: ($om.cost // { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }),
+           input: ($p.models[0].input // $om.input // ["text", "image"]) }) as $m
     | .providers[$name] = (
         ($old // {})
         * $p
@@ -172,9 +178,29 @@ MERGE_PROGRAM='
       )
 '
 
-# build_provider_json <baseUrl> <api> <apiKey> <modelId> <reasoning> <ctx> <max>
+# Normalizza una lista di modalita' di input in un array JSON, validandola
+# contro il tipo dichiarato da pi: input: ("text" | "image")[]. Non si
+# accettano altri valori perche' pi non li accetterebbe.
+# Restituisce 1 se la lista non e' valida.
+normalize_input() {
+    local raw parts tok out=""
+    raw="$(printf '%s' "$1" | tr -d '[:space:]')"
+    [[ -z "$raw" ]] && return 1
+    parts="$(printf '%s' "$raw" | tr ',' '\n')"
+    while IFS= read -r tok; do
+        case "$tok" in
+            text|image) ;;
+            *) return 1 ;;
+        esac
+        out="${out:+$out,}\"$tok\""
+    done <<< "$parts"
+    printf '[%s]' "$out"
+}
+
+# build_provider_json <baseUrl> <api> <apiKey> <modelId> <reasoning> <ctx> <max> [inputJson]
 # <apiKey> puo' essere la chiave in chiaro, un riferimento "$NOME_ENV" (usato
 # con --key-env) oppure la stringa vuota per ometterla del tutto.
+# <inputJson> vuoto = non dichiarare input, e lascia decidere il merge.
 build_provider_json() {
     jq -n \
         --arg baseUrl "$1" \
@@ -184,21 +210,20 @@ build_provider_json() {
         --argjson reasoning "$5" \
         --argjson contextWindow "$6" \
         --argjson maxTokens "$7" \
+        --argjson input "${8:-null}" \
         '{
             baseUrl: $baseUrl,
             api: $api
         }
         + (if $apiKey != "" then {apiKey: $apiKey} else {} end)
         + {
-            models: [{
-                id: $modelId,
-                name: $modelId,
-                reasoning: $reasoning,
-                input: ["text"],
-                contextWindow: $contextWindow,
-                maxTokens: $maxTokens,
-                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
-            }]
+            models: [ (
+                { id: $modelId, name: $modelId, reasoning: $reasoning }
+                + (if $input == null then {} else { input: $input } end)
+                + { contextWindow: $contextWindow,
+                    maxTokens: $maxTokens,
+                    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }
+            ) ]
         }'
 }
 
@@ -268,6 +293,10 @@ Opzioni:
   --no-reasoning       disattiva il reasoning
   --context <n>        context window      (default: 512000)
   --max-tokens <n>     max output tokens   (default: 32768)
+  --input <lista>      capacita' di input, separate da virgola. Valori
+                       ammessi: text, image (unione di pi). Default quando
+                       omesso: text,image su un modello nuovo, altrimenti
+                       l'input gia' presente nel modello
   --from-file <json>   valori mancanti da un JSON
   --config <path>      models.json da scrivere
   --dry-run            stampa l'anteprima e non scrive
@@ -288,7 +317,7 @@ looks_noninteractive() {
             add|--endpoint|--endpoint=*|--api|--api=*|--model|--model=*|\
             --profile|--profile=*|--key|--key=*|--key-env|--key-env=*|\
             --reasoning|--no-reasoning|--context|--context=*|\
-            --max-tokens|--max-tokens=*|--from-file|--config|--config=*|\
+            --max-tokens|--max-tokens=*|--input|--input=*|--from-file|--config|--config=*|\
             --dry-run|--print-config|--yes|-y)
                 return 0 ;;
         esac
@@ -298,7 +327,7 @@ looks_noninteractive() {
 
 OPT_ENDPOINT=""; OPT_API="anthropic"; OPT_MODEL=""; OPT_PROFILE=""
 OPT_KEY=""; OPT_KEY_ENV=""; OPT_REASONING="y"
-OPT_CONTEXT=""; OPT_MAXTOK=""; OPT_FROM_FILE=""
+OPT_CONTEXT=""; OPT_MAXTOK=""; OPT_FROM_FILE=""; OPT_INPUT=""; OPT_INPUT_SET=false
 OPT_DRY_RUN=false; OPT_PRINT_CONFIG=false
 
 add_err() { echo "Errore: $*" >&2; }
@@ -325,6 +354,8 @@ parse_add_args() {
             --context=*)    OPT_CONTEXT="${1#*=}"; shift ;;
             --max-tokens)   OPT_MAXTOK="${2:-}"; shift 2 || return 1 ;;
             --max-tokens=*) OPT_MAXTOK="${1#*=}"; shift ;;
+            --input)        OPT_INPUT="${2:-}"; OPT_INPUT_SET=true; shift 2 || return 1 ;;
+            --input=*)      OPT_INPUT="${1#*=}"; OPT_INPUT_SET=true; shift ;;
             --from-file)    OPT_FROM_FILE="${2:-}"; shift 2 || return 1 ;;
             --config)       PI_CONF_FILE="${2:-}"; shift 2 || return 1 ;;
             --config=*)     PI_CONF_FILE="${1#*=}"; shift ;;
@@ -357,6 +388,13 @@ apply_from_file() {
     done
     if [[ "$(jq -r '.reasoning // empty' "$f")" == "false" && "$OPT_REASONING" == "y" ]]; then
         OPT_REASONING="n"
+    fi
+    # input puo' arrivare come array JSON: si appiattisce in una lista CSV
+    if [[ "$OPT_INPUT_SET" != true ]]; then
+        v="$(jq -r 'if (.[$k] // empty | type) == "array"
+                    then (.[$k] | join(","))
+                    else (.[$k] // empty) end' --arg k input "$f" 2>/dev/null)"
+        if [[ -n "$v" ]]; then OPT_INPUT="$v"; OPT_INPUT_SET=true; fi
     fi
     return 0
 }
@@ -395,6 +433,16 @@ run_add() {
     if [[ ! "$ctx" =~ ^[0-9]+$ ]]; then add_err "--context deve essere un intero"; return 1; fi
     if [[ ! "$max" =~ ^[0-9]+$ ]]; then add_err "--max-tokens deve essere un intero"; return 1; fi
 
+    # input: validato contro l'unione di pi ("text" | "image"). Se assente
+    # resta vuoto e il merge conserva l'input gia' presente nel modello.
+    local input_json=""
+    if [[ "$OPT_INPUT_SET" == true ]]; then
+        input_json="$(normalize_input "$OPT_INPUT")" || {
+            add_err "--input accetta solo text e image, separati da virgola (es. --input text,image): '$OPT_INPUT'"
+            return 1
+        }
+    fi
+
     # --key-env scrive il riferimento "$NOME": pi interpola l'env var a richiesta,
     # quindi la chiave non finisce mai in chiaro nel file.
     local apikey=""
@@ -414,7 +462,7 @@ run_add() {
     local api_mapped; api_mapped="$(map_standard "$OPT_API")"
     local pjson
     pjson="$(build_provider_json "$OPT_ENDPOINT" "$api_mapped" "$apikey" \
-             "$OPT_MODEL" "$reasoning" "$ctx" "$max")" || {
+             "$OPT_MODEL" "$reasoning" "$ctx" "$max" "$input_json")" || {
         add_err "costruzione del JSON fallita"; return 1; }
 
     if [[ "$OPT_DRY_RUN" == true ]]; then
@@ -465,7 +513,7 @@ main() {
     echo
 
     # 1. Endpoint
-    prompt "1/8  Endpoint URL (es. https://api.server.example)"
+    prompt "1/9  Endpoint URL (es. https://api.server.example)"
     ENDPOINT="$REPLY"
     if [[ ! "$ENDPOINT" =~ ^https?:// ]]; then
         echo "Errore: endpoint non valido (deve iniziare con http:// o https://)" >&2
@@ -474,7 +522,7 @@ main() {
 
     # 2. Standard
     echo
-    echo "2/8  Standard API — scegli tra:"
+    echo "2/9  Standard API — scegli tra:"
     echo "      anthropic  -> anthropic-messages   (Claude, modelli Anthropic-compat)"
     echo "      openai     -> openai-completions    (GPT-4, /v1/chat/completions)"
     echo "      responses  -> openai-responses      (OpenAI Responses API)"
@@ -492,14 +540,14 @@ main() {
 
     # 3. Modello
     echo
-    prompt "3/8  Model ID (es. MLR-3, claude-sonnet-4-5)"
+    prompt "3/9  Model ID (es. MLR-3, claude-sonnet-4-5)"
     MODEL_ID="$REPLY"
 
     # 4. Nome profilo (default = model-id sanitized)
     SUGGESTED_NAME="$(sanitize_name "$MODEL_ID")"
     [[ -z "$SUGGESTED_NAME" ]] && SUGGESTED_NAME="custom-provider"
     echo
-    prompt "4/8  Nome del profilo (provider name in pi)" "$SUGGESTED_NAME"
+    prompt "4/9  Nome del profilo (provider name in pi)" "$SUGGESTED_NAME"
     PROFILE_NAME="$REPLY"
     if [[ ! "$PROFILE_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
         echo "Errore: nome '$PROFILE_NAME' non valido (usa solo [a-zA-Z0-9_-])" >&2
@@ -508,7 +556,7 @@ main() {
 
     # 5. API key (opzionale)
     echo
-    echo "5/8  API key"
+    echo "5/9  API key"
     prompt_secret "      Inserisci"
     API_KEY="$REPLY"
     if [[ -z "$API_KEY" ]]; then
@@ -517,12 +565,12 @@ main() {
 
     # 6. Reasoning
     echo
-    prompt_yn "6/8  Modello con reasoning esteso?" "y"
+    prompt_yn "6/9  Modello con reasoning esteso?" "y"
     if [[ "$REPLY" == "y" ]]; then REASONING="true"; else REASONING="false"; fi
 
     # 7. Context window
     echo
-    prompt "7/8  Context window (tokens)" "512000"
+    prompt "7/9  Context window (tokens)" "512000"
     CONTEXT_WINDOW="$REPLY"
     if [[ ! "$CONTEXT_WINDOW" =~ ^[0-9]+$ ]]; then
         echo "Errore: deve essere un intero" >&2
@@ -531,16 +579,34 @@ main() {
 
     # 8. Max output tokens
     echo
-    prompt "8/8  Max output tokens" "32768"
+    prompt "8/9  Max output tokens" "32768"
     MAX_TOKENS="$REPLY"
     if [[ ! "$MAX_TOKENS" =~ ^[0-9]+$ ]]; then
         echo "Errore: deve essere un intero" >&2
         exit 1
     fi
 
+    # 9. Capacita' di input
+    # Il default e' multimodale. Se il modello esiste gia' con un input
+    # diverso, la risposta ne rispecchia la situazione corrente, cosi' un
+    # invio a capo non cambia nulla in silenzio.
+    echo
+    MM_DEFAULT="y"
+    if [[ -f "$PI_CONF_FILE" ]]; then
+        EXISTING_INPUT="$(jq -r --arg n "$PROFILE_NAME" --arg m "$MODEL_ID" \
+            '[.providers[$n].models[]? | select(.id == $m) | (.input // [])[]] | join(",")' \
+            "$PI_CONF_FILE" 2>/dev/null)"
+        if [[ -n "$EXISTING_INPUT" && "$EXISTING_INPUT" != *image* ]]; then
+            MM_DEFAULT="n"
+        fi
+    fi
+    prompt_yn "9/9  Il modello accetta immagini?" "$MM_DEFAULT"
+    if [[ "$REPLY" == "y" ]]; then INPUT_JSON='["text","image"]'; else INPUT_JSON='["text"]'; fi
+
     # Costruisci provider JSON (escaping safe) — stesso builder del percorso add
     PROVIDER_JSON="$(build_provider_json "$ENDPOINT" "$STANDARD_API" "$API_KEY" \
-                     "$MODEL_ID" "$REASONING" "$CONTEXT_WINDOW" "$MAX_TOKENS")"
+                     "$MODEL_ID" "$REASONING" "$CONTEXT_WINDOW" "$MAX_TOKENS" \
+                     "$INPUT_JSON")"
 
     # Anteprima: apiKey mascherata, il valore in chiaro resta solo nel file
     PREVIEW_JSON="$(echo "$PROVIDER_JSON" | mask_api_key)"
@@ -559,7 +625,7 @@ main() {
         echo
         echo "(!) Esiste gia' un provider '$PROFILE_NAME' — verra' aggiornato"
         echo "    I campi che lo script non gestisce (apiKey, promptCache, headers, compat,"
-        echo "    cost personalizzati) e gli eventuali modelli aggiuntivi vengono conservati."
+        echo "    cost e input personalizzati) e gli eventuali modelli aggiuntivi vengono conservati."
         echo "    Viene creato un backup in $PI_CONF_FILE.bak"
         prompt_yn "     Procedere?" "n"
         if [[ "$REPLY" != "y" ]]; then

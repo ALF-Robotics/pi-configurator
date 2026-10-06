@@ -74,7 +74,7 @@
     <a href="https://pi.dev/">pi-code</a> su macOS, Linux e Windows.
     Si installa con una riga di comando, e non sovrascrive mai quello che hai
     già configurato.
-    <span class="pill">MIT</span><span class="pill">EULA v1.1</span>
+    <span class="pill">MIT</span><span class="pill">EULA v1.2</span>
   </p>
 
   <h2>Installa</h2>
@@ -166,8 +166,15 @@
     <tr>
       <td>Non sovrascrive</td>
       <td>Il merge è campo per campo. <code>apiKey</code>, <code>promptCache</code>,
-          <code>headers</code>, <code>compat</code> e i <code>cost</code> reali
-          restano, e i modelli sono uniti per <code>id</code> senza riordinare.</td>
+          <code>headers</code>, <code>compat</code>, i <code>cost</code> reali e
+          l'<code>input</code> già impostato restano, e i modelli sono uniti per
+          <code>id</code> senza riordinare.</td>
+    </tr>
+    <tr>
+      <td>Multimodale</td>
+      <td>Di default scrive <code>input: ["text", "image"]</code>. Con
+          <code>--input</code> scegli tu (<code>--input text</code> solo testo).
+          Senza il flag un re-run conserva l'<code>input</code> già presente.</td>
     </tr>
     <tr>
       <td>Backup</td>
@@ -186,9 +193,9 @@
     </tr>
     <tr>
       <td>Verificato</td>
-      <td><a href="https://github.com/ALF-Robotics/pi-configurator">117 asserzioni</a>
-          in 14 sezioni coprono merge, backup, mascheramento, permessi, modalità non
-          interattiva e installer.</td>
+      <td><a href="https://github.com/ALF-Robotics/pi-configurator">136 asserzioni</a>
+          in 15 sezioni coprono merge, backup, mascheramento, permessi, modalità non
+          interattiva, installer e capacità multimodali.</td>
     </tr>
   </table>
 
@@ -199,6 +206,7 @@
     <tr><td>Reasoning</td><td>attivo</td></tr>
     <tr><td>Context window</td><td><code>512000</code></td></tr>
     <tr><td>Max output tokens</td><td><code>32768</code></td></tr>
+    <tr><td>Input</td><td><code>text, image</code></td></tr>
   </table>
   <div class="note">
     <strong>Attenzione.</strong> <code>maxTokens</code> comprende i token di
@@ -213,6 +221,7 @@
     <tr><td><code>--prefix &lt;dir&gt;</code></td><td>Dove installare. Default <code>~/.local/bin</code>.</td></tr>
     <tr><td><code>--dry-run</code></td><td>Mostra il piano senza scrivere.</td></tr>
     <tr><td><code>--no-verify</code></td><td>Salta il controllo SHA256.</td></tr>
+    <tr><td><code>--input &lt;lista&gt;</code></td><td>Capacità di input: solo <code>text</code> e <code>image</code>. Omesso, conserva quella già presente.</td></tr>
     <tr><td><code>-- &lt;args&gt;</code></td><td>Passa tutto il resto a <code>pi-conf.sh</code>.</td></tr>
   </table>
 

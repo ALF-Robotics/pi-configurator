@@ -1,6 +1,6 @@
 # EULA — pi-configurator
 
-**Version 1.1 — 2026-10-04**
+**Version 1.2 — 2026-10-06**
 
 > 🇮🇹 [Italiano](EULA.md) · 🇬🇧 **English**
 
@@ -8,6 +8,13 @@
 > v1.1 of 2026-10-04. The Italian text is the authoritative version: in case of
 > any interpretive divergence, the Italian prevails (see § 12).
 
+> **1.1 → 1.2**: § 6.6 updated. The limit “`input: ["text"]` is fixed and does
+> not expose multimodal input” has been **resolved**: the script now writes
+> `input: ["text", "image"]` by default, accepts `--input` to choose explicitly,
+> and preserves the `input` already present when the flag is omitted. These
+> changes are only less restrictive than 1.1: no new limit, no change to § 9 and
+> § 10.
+>
 > **1.0 → 1.1**: § 5 and § 6 updated after the resolution of issues #1 and #2
 > (non-destructive merge, automatic backup, key masking in the preview,
 > alignment of the two implementations on an unreadable file).
@@ -145,9 +152,14 @@ without writing — but the rest is not covered by tests.
 it. `pi-conf.ps1` is not covered by behavioural tests: its correctness on
 Windows is **not automatically verified** and requires a manual run.
 
-**6.6 Cost values set to zero.** The generated `cost` fields are always `0` and
-do not represent the provider's actual price. `input: ["text"]` is fixed and
-does not expose multimodal input.
+**6.6 Cost values set to zero — multimodal input resolved.** The generated
+`cost` fields are always `0` and do not represent the provider's actual price.
+As to multimodal input, the limit was **removed as of 1.2**: the script writes
+`input: ["text", "image"]` by default, the `--input` flag allows choosing
+explicitly (`--input text` for text only), and the `input` already present in a
+profile is preserved when the flag is not used. Only the modalities allowed by
+pi's type, `text` and `image`, remain valid: any other value is rejected before
+anything is written.
 
 The contracting party declares that they have been informed of the limits
 listed above, and that they are aware that the backup referred to in § 6.2 is
@@ -272,7 +284,7 @@ in the header. Substantive amendments — in particular those relating to § 9 a
 
 ---
 
-*Document drawn up on 2026-10-04; English translation on 2026-10-05. The
+*Document drawn up on 2026-10-04, revision 1.2 on 2026-10-06; English translation on 2026-10-05. The
 placeholders `<EMAIL>` and `<CITY>` must be completed before circulation.
 Before using this EULA in a commercial or contractual context, it is advisable
 to have it reviewed by a qualified professional.*

@@ -102,10 +102,10 @@ JSON
 
 # Payloads, in prompt order:
 #   1 endpoint, 2 standard, 3 model, 4 profile name, 5 api key, 6 reasoning,
-#   7 context, 8 max output, 9 overwrite confirm, 10 final confirm
-P_NEW='https://api.server.example\nanthropic\nMLR-3\nfresh\ntestkey_NEWKEY0001\ny\n\n\ny\n'
-P_RERUN='https://api.server.example\nanthropic\nMLR-3\nMLR-3\n\ny\n512000\n32768\ny\ny\n'
-P_ADD='https://api.server.example\nanthropic\nMLR-3-turbo\nMLR-3\ntestkey_ADDEDKEY02\ny\n800000\n65536\ny\ny\n'
+#   7 context, 8 max output, 9 multimodal, 10 overwrite confirm, 11 final confirm
+P_NEW='https://api.server.example\nanthropic\nMLR-3\nfresh\ntestkey_NEWKEY0001\ny\n\n\n\ny\n'
+P_RERUN='https://api.server.example\nanthropic\nMLR-3\nMLR-3\n\ny\n512000\n32768\n\ny\ny\n'
+P_ADD='https://api.server.example\nanthropic\nMLR-3-turbo\nMLR-3\ntestkey_ADDEDKEY02\ny\n800000\n65536\n\ny\ny\n'
 
 echo "pi-confurator — behavioural test suite"
 echo
@@ -126,7 +126,7 @@ echo
 # --- §2 new provider, api key omitted ---------------------------------------
 echo "§2 nuovo provider senza api key"
 F="$WORK/s2.json"
-run_conf "$F" 'https://api.server.example\nanthropic\nMLR-3\nnokey\n\ny\n\n\ny\n'
+run_conf "$F" 'https://api.server.example\nanthropic\nMLR-3\nnokey\n\ny\n\n\n\ny\n'
 assert_jq "apiKey assente quando omessa"         "$F" '.providers.nokey | has("apiKey")' 'false'
 # l'anteprima non deve inventare il campo: jq |= su una chiave assente la crea
 # con null, e l'utente vedrebbe un apiKey che nel file non c'e'
@@ -564,6 +564,171 @@ else
         ok "installer delegato alterato => rifiutato"
     else fail "installer delegato alterato => rifiutato" "exit != 0 con checksum" "$(head -3 "$WORK/out")"; fi
 fi
+
+echo
+
+# --- §15 capacita' multimodali ----------------------------------------------
+echo "§15 capacita' multimodali (input)"
+
+# Un provider gia' configurato a mano come multimodale: e' il caso che il
+# merge non deve distruggere. Nel seed normale l'input e' ["text"], qui
+# l'utente l'ha portato a mano a ["text","image"].
+seed_mm() {
+    cat > "$1" <<'JSON'
+{
+  "providers": {
+    "MLR-3": {
+      "baseUrl": "https://api.server.example",
+      "api": "anthropic-messages",
+      "apiKey": "testkey_KEEPME0000000001",
+      "models": [
+        { "id": "MLR-3", "name": "MLR-3", "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 512000, "maxTokens": 32768,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 } }
+      ]
+    }
+  }
+}
+JSON
+}
+
+# Il default e' multimodale: testo piu' immagine
+F="$WORK/s15-default.json"
+run_conf "$F" "$P_NEW"
+assert_jq "default su provider nuovo = testo + immagine" \
+    "$F" '.providers.fresh.models[0].input | join(",")' 'text,image'
+
+# --input esplicito in modalita' non interattiva
+F="$WORK/s15-flag.json"
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --api anthropic --model MLR-3 --profile MLR-3 \
+    --key-env TESTKEY_MM --input text,image --yes > "$WORK/out" 2>&1
+assert_jq "--input text,image scrive entrambe le modalita'" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text,image'
+
+# REGRESSIONE: re-run su un modello multimodale senza diregli nulla.
+# Prima di questa sezione il merge riscriveva input: ["text"] e cancellava
+# l'immagine configurata a mano.
+F="$WORK/s15-preserve.json"
+seed_mm "$F"
+run_conf "$F" "$P_RERUN"
+assert_jq "re-run NON sovrascrive input configurato a mano" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text,image'
+
+# REGRESSIONE vera e propria: e' il percorso NON interattivo senza --input a
+# non dichiarare input, e quindi a far decidere al merge. Il test qui sopra
+# passa dal prompt, che scrive sempre un valore esplicito, e non arriverebbe a
+# coprire la conservazione se la preservazione sparisse dal merge.
+F="$WORK/s15-preserve-add.json"
+seed_mm "$F"
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --api anthropic --model MLR-3 --profile MLR-3 \
+    --yes > "$WORK/out" 2>&1
+assert_jq "add senza --input conserva il multimodale" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text,image'
+
+F="$WORK/s15-preserve-add-text.json"
+seed "$F"
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --api anthropic --model MLR-3 --profile MLR-3 \
+    --yes > "$WORK/out" 2>&1
+assert_jq "add senza --input conserva il solo-testo" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text'
+
+# L'interactive deve inoltre proporre 'y' come default quando il modello
+# esiste gia' multimodale, cosi' un invio a capo non lo degrada.
+seed_mm "$WORK/s15-default-on-mm.json"
+printf '%b' 'https://api.server.example\nanthropic\nMLR-3\nMLR-3\n\ny\n\n\n\ny\ny\n' \
+    > "$WORK/stdin"
+PI_CONF_FILE="$WORK/s15-default-on-mm.json" bash "$CONF_SH" \
+    < "$WORK/stdin" > "$WORK/out" 2>&1
+assert_jq "default interattivo propose y su modello gia' multimodale" \
+    "$WORK/s15-default-on-mm.json" '.providers["MLR-3"].models[0].input | join(",")' 'text,image'
+
+# Simmetrico: un modello solo-testo non deve essere promosso a multimodale da
+# un semplice invio a capo, perche' il default ne offrirebbe la promozione.
+F="$WORK/s15-keep-text.json"
+seed "$F"
+run_conf "$F" "$P_RERUN"
+assert_jq "re-run NON promuove a multimodale un modello solo-testo" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text'
+
+# --input esplicito vince sulla conservazione
+F="$WORK/s15-explicit.json"
+seed_mm "$F"
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --api anthropic --model MLR-3 --profile MLR-3 \
+    --input text --yes > "$WORK/out" 2>&1
+assert_jq "--input text degrada esplicitamente a testo" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text'
+
+# Solo image, senza text: ammesso dal tipo di pi, ("text"|"image")[]
+F="$WORK/s15-imgonly.json"
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --api anthropic --model MLR-3 --profile MLR-3 \
+    --input image --yes > "$WORK/out" 2>&1
+assert_jq "--input image da solo ammesso" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'image'
+
+# Valori fuori dal tipo di pi rifiutati PRIMA di scrivere
+for bad in audio video pdf ""; do
+    F="$WORK/s15-bad-${bad:-empty}.json"
+    PI_CONF_FILE="$F" bash "$CONF_SH" add \
+        --endpoint https://api.server.example --api anthropic --model MLR-3 \
+        --input "$bad" --yes > "$WORK/out" 2>&1
+    rc=$?
+    if [ $rc -ne 0 ] && [ ! -e "$F" ]; then
+        ok "--input '$bad' rifiutato, config non scritta"
+    else
+        fail "--input '$bad' rifiutato, config non scritta" \
+             "exit != 0 e nessun file" \
+             "exit=$rc, config=$([ -e "$F" ] && echo scritta || echo non-scritta)"
+    fi
+done
+
+# --from-file puo' portare input
+F="$WORK/s15-fromfile.json"
+printf '%s\n' '{"endpoint":"https://api.server.example","model":"MLR-3","input":["text","image"]}' > "$WORK/ff.json"
+PI_CONF_FILE="$F" bash "$CONF_SH" add --from-file "$WORK/ff.json" --profile MLR-3 --yes > "$WORK/out" 2>&1
+assert_jq "--from-file con input" "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text,image'
+
+# Il flag deve essere riconosciuto come non interattivo anche da solo
+F="$WORK/s15-trigger.json"
+PI_CONF_FILE="$F" bash "$CONF_SH" \
+    --endpoint https://api.server.example --model MLR-3 --profile MLR-3 \
+    --input text,image --yes < /dev/null > "$WORK/out" 2>&1
+assert_jq "--input da solo attiva la modalita' non interattiva" \
+    "$F" '.providers["MLR-3"].models[0].input | join(",")' 'text,image'
+
+# L'anteprima deve mostrare la modalita' richiesta. Test dedicato con
+# --dry-run: greppare l'output lasciato dal test precedente non dimostrerebbe
+# nulla, cambierebbe solo se il test precedente cambiasse.
+F="$WORK/s15-preview.json"
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --model MLR-3 --profile MLR-3 \
+    --input text,image --dry-run --yes > "$WORK/out" 2>&1
+if grep -q '"image"' "$WORK/out"; then
+    ok "l'anteprima mostra la modalita' image"
+else
+    fail "l'anteprima mostra la modalita' image" "image presente" "$(head -5 "$WORK/out")"
+fi
+if [ -e "$F" ]; then
+    fail "--dry-run con --input non scrive nulla" "config assente" "config scritta"
+else
+    ok "--dry-run con --input non scrive nulla"
+fi
+
+# --- §15b parita' statica su pi-conf.ps1 (non eseguito) ---------------------
+# pwsh non serve per eseguire la suite: questi controlli impediscono che la
+# preservazione venga rimossa da una delle due implementazioni.
+ps="$(cat "$REPO_DIR/pi-conf.ps1")"
+grep -q -- '--input' <<<"$ps" \
+    && ok "pi-conf.ps1 dichiara --input" \
+    || fail "pi-conf.ps1 dichiara --input" "--input presente" "assente"
+grep -qE "\['input'\] *= *\\\$Old\.input" <<<"$ps" \
+    && ok "pi-conf.ps1 preserva input come fa cost" \
+    || fail "pi-conf.ps1 preserva input come fa cost" "Merge-Model ripristina input dall'old" "assente"
 
 echo
 
