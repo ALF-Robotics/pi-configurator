@@ -168,14 +168,20 @@ function Get-SanitizedName {
 }
 
 function Merge-Model {
-    # Un modello esistente viene aggiornato campo per campo. Il `cost` viene
-    # mantenuto: lo script scrive sempre zero, che azzererebbero un prezzo
-    # configurato a mano.
+    # Un modello esistente viene aggiornato campo per campo. `cost` e `input`
+    # vengono mantenuti: lo script scrive sempre cost a zero, che azzererebbe
+    # un prezzo configurato a mano, e un input senza dichiarazione degraderebbe
+    # un modello multimodale a ["text"].
     param($Old, $New)
     $res = [ordered]@{}
     foreach ($p in $Old.PSObject.Properties) { $res[$p.Name] = $p.Value }
     foreach ($k in $New.Keys)             { $res[$k] = $New[$k] }
-    if ($Old.PSObject.Properties.Name -contains 'cost') { $res['cost'] = $Old.cost }
+    if ($Old.PSObject.Properties.Name -contains 'cost')  { $res['cost']  = $Old.cost }
+    if (-not $New.Keys.Contains('input') -and
+        ($Old.PSObject.Properties.Name -contains 'input')) { $res['input'] = $Old.input }
+    if (-not $New.Keys.Contains('input') -and -not ($Old.PSObject.Properties.Name -contains 'input')) {
+        $res['input'] = @('text','image')
+    }
     return ($res | ConvertFrom-Json)
 }
 
@@ -208,6 +214,16 @@ function Merge-Provider {
         }
     }
     if (-not $found) { $outModels += ,($newModel | ConvertFrom-Json) }
+
+    # Un modello nuovo senza `input` dichiarato deve comunque avere il default
+    # testo puro: qui non passa da Merge-Model.
+    if (-not ($outModels | Where-Object { $_.id -eq $newId } | ForEach-Object { $_.PSObject.Properties.Name -contains 'input' } | Where-Object { $_ })) {
+        foreach ($m in $outModels) {
+            if ($m.id -eq $newId) {
+                $m | Add-Member -NotePropertyName 'input' -NotePropertyValue @('text','image') -Force
+            }
+        }
+    }
 
     $merged['models'] = $outModels
     return $merged
@@ -260,6 +276,10 @@ Opzioni:
   -NoReasoning          disattiva il reasoning
   -Context <n>          context window      (default: 512000)
   -MaxTokens <n>        max output tokens   (default: 32768)
+  -Input <lista>       capacita' di input, separate da virgola. Valori ammessi:
+                       text, image (unione di pi). Default quando omesso:
+                       text,image su un modello nuovo, altrimenti l'input
+                       gia' presente nel modello
   -FromFile <json>      valori mancanti da un JSON
   -Config <path>        models.json da scrivere
   -DryRun               stampa l'anteprima e non scrive
@@ -280,10 +300,11 @@ function Get-AddOptions {
                   '--profile','-profile','--key','-key','--key-env','-keyenv',
                   '--reasoning','--no-reasoning','-noreasoning',
                   '--context','-context','--max-tokens','-maxtokens',
+                  '--input','-input',
                   '--from-file','-fromfile','--config','-config',
                   '--dry-run','--print-config','-printconfig','--yes','-y')
     $long = @('--endpoint','--api','--model','--profile','--key','--key-env',
-              '--context','--max-tokens','--from-file','--config')
+              '--context','--max-tokens','--input','--from-file','--config')
 
     $isAdd = $false
     foreach ($a in $Args) {
@@ -310,7 +331,7 @@ function Get-AddOptions {
     $o = @{
         endpoint = $null; api = 'anthropic'; model = $null; profile = $null
         key = $null;     keyEnv = $null; reasoning = 'y'
-        context = $null; maxTokens = $null
+        context = $null; maxTokens = $null; input = $null
         fromFile = $null; config = $null
         dryRun = $false; printConfig = $false
     }
@@ -333,6 +354,7 @@ function Get-AddOptions {
             '--key-env'      { $o.keyEnv     = $v }
             '--context'      { $o.context    = $v }
             '--max-tokens'   { $o.maxTokens  = $v }
+            '--input'        { $o.input      = $v }
             '--from-file'    { $o.fromFile   = $v }
             '--config'       { $o.config     = $v }
             default {
@@ -365,6 +387,10 @@ function Invoke-Add {
         if (-not $O.keyEnv)    { $O.keyEnv     = $f.keyEnv }
         if (-not $O.context)   { $O.context    = $f.context }
         if (-not $O.maxTokens) { $O.maxTokens  = $f.maxTokens }
+        if ($null -eq $O.input -and ($f.PSObject.Properties.Name -contains 'input')) {
+            $in = $f.input
+            $O.input = if ($in -is [array]) { ($in -join ',') } else { "$in" }
+        }
         if (($f.PSObject.Properties.Name -contains 'reasoning') -and $f.reasoning -eq $false -and $O.reasoning -eq 'y') {
             $O.reasoning = 'n'
         }
@@ -406,6 +432,20 @@ function Invoke-Add {
     if ("$max" -notmatch '^\d+$') {
         Write-Host "Errore: --max-tokens deve essere un intero" -ForegroundColor Red
         return 1
+    }
+
+    # input: validato contro l'unione di pi ("text" | "image"). Se assente
+    # resta $null e il merge conserva l'input gia' presente nel modello.
+    $inputList = $null
+    if ($null -ne $O.input) {
+        $inputList = @()
+        foreach ($tok in ("$($O.input)" -replace '\s', '' -split ',')) {
+            if ($tok -ne 'text' -and $tok -ne 'image') {
+                Write-Host "Errore: --input accetta solo text e image, separati da virgola (es. --input text,image): '$($O.input)'" -ForegroundColor Red
+                return 1
+            }
+            $inputList += $tok
+        }
     }
 
     # -KeyEnv scrive il riferimento "$NOME": pi interpola l'env var a richiesta,
@@ -533,7 +573,7 @@ Write-Host "Binario pi: $PiBin"
 Write-Host ""
 
 # 1. Endpoint
-$Endpoint = Get-PromptInput "1/8  Endpoint URL (es. https://api.server.example)"
+$Endpoint = Get-PromptInput "1/9  Endpoint URL (es. https://api.server.example)"
 if ($Endpoint -notmatch '^https?://') {
     Write-Host "Errore: endpoint non valido (deve iniziare con http:// o https://)" -ForegroundColor Red
     exit 1
@@ -541,7 +581,7 @@ if ($Endpoint -notmatch '^https?://') {
 
 # 2. Standard
 Write-Host ""
-Write-Host "2/8  Standard API - scegli tra:"
+Write-Host "2/9  Standard API - scegli tra:"
 Write-Host "      anthropic  -> anthropic-messages   (Claude, modelli Anthropic-compat)"
 Write-Host "      openai     -> openai-completions    (GPT-4, /v1/chat/completions)"
 Write-Host "      responses  -> openai-responses      (OpenAI Responses API)"
@@ -558,12 +598,12 @@ Write-Host "      -> mappato a: $StandardApi"
 
 # 3. Modello
 Write-Host ""
-$ModelId = Get-PromptInput "3/8  Model ID (es. MLR-3, claude-sonnet-4-5)"
+$ModelId = Get-PromptInput "3/9  Model ID (es. MLR-3, claude-sonnet-4-5)"
 
 # 4. Nome profilo
 $Suggested = Get-SanitizedName $ModelId
 Write-Host ""
-$ProfileName = Get-PromptInput "4/8  Nome del profilo (provider name in pi)" $Suggested
+$ProfileName = Get-PromptInput "4/9  Nome del profilo (provider name in pi)" $Suggested
 if ($ProfileName -notmatch '^[a-zA-Z0-9_-]+$') {
     Write-Host "Errore: nome '$ProfileName' non valido (usa solo [a-zA-Z0-9_-])" -ForegroundColor Red
     exit 1
@@ -571,19 +611,19 @@ if ($ProfileName -notmatch '^[a-zA-Z0-9_-]+$') {
 
 # 5. API key (con stelle in tempo reale)
 Write-Host ""
-$ApiKey = Read-SecretWithStars "5/8  API key (vuoto = salta, configura dopo con /login): "
+$ApiKey = Read-SecretWithStars "5/9  API key (vuoto = salta, configura dopo con /login): "
 if ([string]::IsNullOrEmpty($ApiKey)) {
     Write-Host "      (saltata - configura dopo con: /login $ProfileName, oppure imposta env var, oppure edita $PiConfFile)"
 }
 
 # 6. Reasoning
 Write-Host ""
-$ReasoningChoice = Get-PromptYN "6/8  Modello con reasoning esteso?" "y"
+$ReasoningChoice = Get-PromptYN "6/9  Modello con reasoning esteso?" "y"
 $ReasoningBool = if ($ReasoningChoice -eq 'y') { $true } else { $false }
 
 # 7. Context window
 Write-Host ""
-$ContextWindowStr = Get-PromptInput "7/8  Context window (tokens)" "512000"
+$ContextWindowStr = Get-PromptInput "7/9  Context window (tokens)" "512000"
 if ($ContextWindowStr -notmatch '^\d+$') {
     Write-Host "Errore: deve essere un intero" -ForegroundColor Red
     exit 1
@@ -592,12 +632,35 @@ $ContextWindow = [int]$ContextWindowStr
 
 # 8. Max output tokens
 Write-Host ""
-$MaxTokensStr = Get-PromptInput "8/8  Max output tokens" "32768"
+$MaxTokensStr = Get-PromptInput "8/9  Max output tokens" "32768"
 if ($MaxTokensStr -notmatch '^\d+$') {
     Write-Host "Errore: deve essere un intero" -ForegroundColor Red
     exit 1
 }
 $MaxTokens = [int]$MaxTokensStr
+
+# 9. Capacita' di input
+# Il default e' multimodale. Se il modello esiste gia' con un input diverso,
+# la risposta ne rispecchia la situazione corrente, cosi' un invio a capo non
+# cambia nulla in silenzio.
+Write-Host ""
+$MmDefault = 'y'
+if (Test-Path $PiConfFile) {
+    try {
+        $cur = Get-Content $PiConfFile -Raw | ConvertFrom-Json
+        $prov = $cur.providers.$ProfileName
+        if ($prov) {
+            foreach ($m in @($prov.models)) {
+                if ($m.id -eq $ModelId) {
+                    $has = @($m.input) -contains 'image'
+                    if (-not $has -and $m.input) { $MmDefault = 'n' }
+                }
+            }
+        }
+    } catch { }
+}
+$MmChoice = Get-PromptYN "9/9  Il modello accetta immagini?" $MmDefault
+$InputList = if ($MmChoice -eq 'y') { @('text','image') } else { @('text') }
 
 # Costruisci provider come PSCustomObject (ordinato)
 $provider = [ordered]@{
@@ -619,11 +682,11 @@ $model = [ordered]@{
     id            = $ModelId
     name          = $ModelId
     reasoning     = $ReasoningBool
-    input         = @('text')
     contextWindow = $ContextWindow
     maxTokens     = $MaxTokens
     cost          = $cost
 }
+if ($null -ne $InputList -and $InputList.Count -gt 0) { $model['input'] = $InputList }
 $provider.models = @($model)
 
 $ProviderJson = $provider | ConvertTo-Json -Depth 10
