@@ -39,6 +39,22 @@ export PATH="$STUB_DIR:$PATH"
 # test l'ha toccata. Senza questa guardia un test che dimentica PI_CONF_FILE
 # scrive sul models.json dell'utente e fallisce in silenzio: e' successo.
 REAL_CONF="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/models.json"
+#Esegue un comando con un limite di tempo e restituisce il suo exit code.
+# Serve per i test che potrebbero hangare (una prompt su stdin chiuso).
+run_with_timeout() {
+    local secs="$1"; shift
+    "$@" &
+    local pid=$! waited=0
+    while kill -0 "$pid" 2>/dev/null && [[ "$waited" -lt "$secs" ]]; do
+        sleep 1; waited=$((waited+1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+        return 124
+    fi
+    wait "$pid"
+}
+
 sha256_of() {
     if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
     else shasum -a 256 "$1" | cut -d' ' -f1; fi
@@ -792,6 +808,27 @@ grep -qE "\['input'\] *= *\\\$Old\.input" <<<"$ps" \
     || fail "pi-conf.ps1 preserva input come fa cost" "Merge-Model ripristina input dall'old" "assente"
 
 echo
+
+# --- §17 stdin chiuso: deve uscire, non girare all'infinito ----------------
+# Con lo stdin chiuso (EOF) una prompt non obbligatoria ripeterebbe la domanda
+# per sempre. E' il caso di un one-liner eseguito senza terminale.
+echo "§17 stdin chiuso (EOF)"
+F="$WORK/s17-eof.json"
+out="$(PI_CONF_FILE="$F" run_with_timeout 10 bash "$CONF_SH" < /dev/null 2>&1)"; rc=$?
+if [[ "$rc" -eq 124 ]]; then
+    fail "stdin chiuso: lo script esce invece di girare all'infinito" \
+         "exit entro 10s" "timeout: lo script gira ancora"
+elif [[ "$rc" -ne 0 ]] && grep -q 'EOF' <<<"$out"; then
+    ok "stdin chiuso: lo script esce con un errore esplicito"
+else
+    fail "stdin chiuso: lo script esce con un errore esplicito" \
+         "exit non zero e messaggio EOF" "exit=$rc out=$(head -3 <<<"$out")"
+fi
+if [ -e "$F" ]; then
+    fail "stdin chiuso: nessuna configurazione scritta" "config assente" "config scritta"
+else
+    ok "stdin chiuso: nessuna configurazione scritta"
+fi
 
 # --- §16 pi-conf.ps1 eseguito davvero (solo se pwsh e' disponibile) ----------
 # Fino alla v0.4.0 pi-conf.ps1 non era mai stato eseguito: i controlli

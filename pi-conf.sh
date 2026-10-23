@@ -68,19 +68,34 @@ map_standard() {
     esac
 }
 
+# Legge una riga dallo stdin. Se lo stdin e' chiuso (EOF) lo script esce con
+# un errore esplicito: senza questo controllo, una prompt che richiede una
+# risposta gira all'infinito su un input vuoto (tipico di un one-liner
+# eseguito senza terminale).
+read_line() {
+    local prompt_text="$1"
+    if ! IFS= read -r -p "$prompt_text" REPLY; then
+        echo "" >&2
+        echo "Errore: stdin chiuso (EOF) durante una prompt: non c'e' niente da leggere." >&2
+        exit 1
+    fi
+}
+
 # Stampa prompt e mette la risposta in $REPLY (mai vuoto se non c'e' default)
 prompt() {
     local label="$1"
     local default="${2:-}"
     local value
     if [[ -n "$default" ]]; then
-        read -r -p "$label [$default]: " value
+        read_line "$label [$default]: "
+        value="$REPLY"
         value="${value:-$default}"
     else
-        read -r -p "$label: " value
-        while [[ -z "$value" ]]; do
+        while true; do
+            read_line "$label: "
+            value="$REPLY"
+            [[ -z "$value" ]] || break
             echo "  (!) richiesto" >&2
-            read -r -p "$label: " value
         done
     fi
     REPLY="$value"
@@ -91,8 +106,14 @@ prompt() {
 prompt_secret() {
     local label="$1" value="" char
     printf "%s" "$label (vuoto = salta, configura dopo con /login): "
-    while IFS= read -r -s -n 1 char; do
-        # read -s -n 1 restituisce stringa vuota su Enter (o EOF)
+    while true; do
+        if ! IFS= read -r -s -n 1 char; then
+            # EOF: stdin chiuso, niente da leggere
+            echo "" >&2
+            echo "Errore: stdin chiuso (EOF) durante la lettura della chiave." >&2
+            exit 1
+        fi
+        # read -s -n 1 restituisce stringa vuota su Enter
         if [[ -z "$char" ]]; then
             break
         fi
@@ -122,7 +143,8 @@ prompt_yn() {
         *)           suffix="[y/N]" ;;
     esac
     while true; do
-        read -r -p "$label $suffix: " value
+        read_line "$label $suffix: "
+        value="$REPLY"
         value="${value:-$default}"
         # case-insensitive: convertiamo a lowercase con tr
         local lower

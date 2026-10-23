@@ -275,6 +275,103 @@ if (Test-Path $conf) {
     assert_eq 'D4 merge: input esistente conservato' 'text,image' ($w.providers.'mlr-3'.models[0].input -join ',')
 }
 
+# Esegue uno script del repo (installer) in un processo figlio, dalla
+# directory del repo: e' la condizione in cui gli installer usano il checkout
+# locale invece della rete.
+function Invoke-PSScript {
+    param([string]$ScriptName, [string[]]$ScriptArgs, [string]$ConfigFile, [int]$TimeoutMs = 60000)
+    $env:PI_CONF_FILE = $ConfigFile
+    $env:PI_BIN = Join-Path $Work 'pi-does-not-exist'
+
+    $quoted = @()
+    foreach ($a in $ScriptArgs) {
+        if ($a -match "[\s']") { $quoted += ("'" + $a.Replace("'", "''") + "'") }
+        else { $quoted += $a }
+    }
+    $target = Join-Path $RepoDir $ScriptName
+    $runner = Join-Path $Work ("runner-" + [System.IO.Path]::GetRandomFileName() + '.ps1')
+    Set-Content -Path $runner -Encoding UTF8 -Value ("& '" + $target + "' " + ($quoted -join ' ') + "`nexit `$LASTEXITCODE")
+
+    $outFile = Join-Path $Work ("stdout-" + [System.IO.Path]::GetRandomFileName())
+    $errFile = Join-Path $Work ("stderr-" + [System.IO.Path]::GetRandomFileName())
+    $p = Start-Process -FilePath $Pwsh -ArgumentList @('-NoProfile', '-File', $runner) -NoNewWindow -PassThru `
+            -WorkingDirectory $RepoDir -RedirectStandardOutput $outFile -RedirectStandardError $errFile `
+            -RedirectStandardInput (Join-Path $Work 'stdin-empty')
+    if (-not $p.WaitForExit($TimeoutMs)) {
+        try { $p.Kill() } catch { }
+        return @{ Code = -1; Out = "[TIMEOUT ${TimeoutMs}ms]" }
+    }
+    $text = ((Get-Content $outFile -Raw -ErrorAction SilentlyContinue) + (Get-Content $errFile -Raw -ErrorAction SilentlyContinue))
+    return @{ Code = $p.ExitCode; Out = $text }
+}
+
+Write-Host "§E stdin chiuso e path di default"
+
+# --- E1: stdin chiuso (EOF) -> esce, non gira all'infinito ------------------
+$r = Invoke-PSConf -ConfArgs @() -ConfigFile (New-ConfFile 'e1.json')
+assert_match 'E1 stdin chiuso: errore esplicito' $r.Out 'EOF'
+if ($r.Code -ne 0) { ok 'E1 stdin chiuso: exit code non zero' }
+else { fail 'E1 stdin chiuso: exit code non zero' 'diverso da 0' $r.Code }
+if (Test-Path (Join-Path $Work 'e1.json')) {
+    fail 'E1 stdin chiuso: nessuna configurazione scritta' 'config assente' 'config scritta'
+} else {
+    ok 'E1 stdin chiuso: nessuna configurazione scritta'
+}
+
+# --- E2: senza PI_CONF_FILE non deve crashare su USERPROFILE assente -------
+# Su macOS/Linux $env:USERPROFILE non esiste: Join-Path su un path nullo
+# andrebbe in errore. Il solo -Help non scrive nulla.
+$runner2 = Join-Path $Work 'runner-noconf.ps1'
+Set-Content -Path $runner2 -Encoding UTF8 -Value "`$sb = [scriptblock]::Create((Get-Content -Raw '$Script'))`n& `$sb -Help`nexit `$LASTEXITCODE"
+$out2 = Join-Path $Work 'stdout-noconf.txt'
+$err2 = Join-Path $Work 'stderr-noconf.txt'
+$p2 = Start-Process -FilePath $Pwsh -ArgumentList @('-NoProfile','-File',$runner2) -NoNewWindow -PassThru `
+        -RedirectStandardOutput $out2 -RedirectStandardError $err2 -RedirectStandardInput (Join-Path $Work 'stdin-empty')
+$null = $p2.WaitForExit(15000)
+$txt2 = ((Get-Content $out2 -Raw -ErrorAction SilentlyContinue) + (Get-Content $err2 -Raw -ErrorAction SilentlyContinue))
+assert_match 'E2 senza PI_CONF_FILE: uso stampato' $txt2 'pi-conf\.ps1'
+assert_not_match 'E2 senza PI_CONF_FILE: nessun errore di binding' $txt2 "Cannot bind argument to parameter 'Path'"
+
+Write-Host "§F installer PowerShell"
+
+# --- F1: install.ps1 in dry run, dal checkout locale ------------------------
+$prefix1 = Join-Path $Work 'prefix1'
+$r = Invoke-PSScript -ScriptName 'install.ps1' -ScriptArgs @('-Prefix', $prefix1, '-DryRun') `
+        -ConfigFile (New-ConfFile 'f1.json')
+assert_match 'F1 install.ps1: usa il checkout locale' $r.Out 'checkout locale'
+assert_match 'F1 install.ps1: prefisso indicato' $r.Out ([regex]::Escape($prefix1))
+assert_match 'F1 install.ps1: sha256 verificato' $r.Out 'pi-conf\.sh\s+OK'
+if (Test-Path $prefix1) { fail 'F1 install.ps1: dry run non installa nulla' 'prefix assente' 'prefix creato' }
+else { ok 'F1 install.ps1: dry run non installa nulla' }
+
+# --- F2: install-provider.ps1 in dry run ------------------------------------
+# Il bug: splattando un array di stringhe gli argomenti diventano posizionali
+# e '-Ref' finisce nel valore del ref.
+$prefix2 = Join-Path $Work 'prefix2'
+$r2 = Invoke-PSScript -ScriptName 'install-provider.ps1' -ScriptArgs @(
+        '-Endpoint', 'https://api.server.example', '-Api', 'anthropic', '-Model', 'MLR-3',
+        '-KeyEnv', 'MLR_API_KEY', '-Prefix', $prefix2, '-DryRun') -ConfigFile (New-ConfFile 'f2.json')
+assert_not_match 'F2 install-provider.ps1: il ref non e'' la stringa -Ref' $r2.Out 'ref:\s+-Ref'
+assert_match 'F2 install-provider.ps1: prefisso passato per nome' $r2.Out ([regex]::Escape($prefix2))
+assert_match 'F2 install-provider.ps1: piano del provider' $r2.Out 'pi-conf\.ps1 add --endpoint https://api\.server\.example --api anthropic --model MLR-3 --key-env MLR_API_KEY'
+
+# --- F3: install-provider.ps1 completo, offline -----------------------------
+$prefix3 = Join-Path $Work 'prefix3'
+$conf3 = New-ConfFile 'f3.json'
+$r3 = Invoke-PSScript -ScriptName 'install-provider.ps1' -ScriptArgs @(
+        '-Endpoint', 'https://api.server.example', '-Api', 'anthropic', '-Model', 'MLR-3',
+        '-KeyEnv', 'MLR_API_KEY', '-Prefix', $prefix3) -ConfigFile $conf3
+assert_eq 'F3 install-provider.ps1: exit code 0' 0 $r3.Code
+if (Test-Path (Join-Path $prefix3 'pi-conf.ps1')) { ok 'F3 install-provider.ps1: tool installato' }
+else { fail 'F3 install-provider.ps1: tool installato' 'pi-conf.ps1 presente' 'assente' }
+if (Test-Path $conf3) {
+    $w3 = Get-Content $conf3 -Raw | ConvertFrom-Json
+    assert_eq 'F3 install-provider.ps1: provider configurato' 'https://api.server.example' $w3.providers.'mlr-3'.baseUrl
+    assert_eq 'F3 install-provider.ps1: apiKey come riferimento env' '$MLR_API_KEY' $w3.providers.'mlr-3'.apiKey
+} else {
+    fail 'F3 install-provider.ps1: provider configurato' 'config scritta' 'config assente'
+}
+
 Remove-Work
 
 Write-Host ""

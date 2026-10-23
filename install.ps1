@@ -72,19 +72,33 @@ $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("pi-conf-" + [System.Guid]::
 New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $cleanup = { if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue } }
 
-Write-Step 'Download'
+# se lo script gira da un checkout locale si puo' installare senza rete
+# (stessa regola di install.sh)
+$Local = $false
+if ((Test-Path './install.ps1') -and (Test-Path './pi-conf.sh')) { $Local = $true }
+
+if ($Local) { Write-Step 'Copia dal checkout locale' } else { Write-Step 'Download' }
 try {
     foreach ($f in $Files) {
-        Write-Info "$Raw/$f"
         $dest = Join-Path $tmp $f
-        Invoke-WebRequest -Uri "$Raw/$f" -OutFile $dest -UseBasicParsing
+        if ($Local) {
+            Write-Info "./$f"
+            Copy-Item -Path "./$f" -Destination $dest -Force
+        } else {
+            Write-Info "$Raw/$f"
+            Invoke-WebRequest -Uri "$Raw/$f" -OutFile $dest -UseBasicParsing
+        }
     }
 
     # --- verifica integrita' -------------------------------------------------
     $sumsPath = Join-Path $tmp 'SHA256SUMS'
     if (-not $NoVerify) {
         try {
-            Invoke-WebRequest -Uri "$Raw/SHA256SUMS" -OutFile $sumsPath -UseBasicParsing -ErrorAction Stop
+            if ($Local) {
+                Copy-Item -Path './SHA256SUMS' -Destination $sumsPath -Force
+            } else {
+                Invoke-WebRequest -Uri "$Raw/SHA256SUMS" -OutFile $sumsPath -UseBasicParsing -ErrorAction Stop
+            }
             Write-Step 'Verifica sha256'
             $sums = @{}
             foreach ($line in (Get-Content $sumsPath)) {

@@ -61,27 +61,33 @@ viene eseguito direttamente dal web, sul posto.
 ### macOS / Linux
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.3/pi-conf.sh)"
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1 | iex
+irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.3/pi-conf.ps1 | iex
 ```
 
 `irm` è l'alias di `Invoke-WebRequest`, `iex` quello di `Invoke-Expression`.
-Per esteso:
+
+Una forma che non dipende da *come* `Invoke-WebRequest` restituisce la risposta,
+valida su Windows PowerShell 5.1 come su PowerShell 7:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1 | Invoke-Expression
+& ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.3/pi-conf.ps1')))
 ```
 
-> [!NOTE]
-> **In PowerShell il pipe funziona anche in interattivo**, al contrario di bash:
-> lo stdin non viene toccato, quindi le prompt leggono le tue risposte.
-> `-UseBasicParsing` serve a Windows PowerShell 5.1 (su PowerShell 7 è
-> ridondante, ma innocuo).
+> [!WARNING]
+> **Non usare `(irm …).Content`.** Su PowerShell 7 `Invoke-WebRequest` restituisce
+> il contenuto come semplice stringa, quindi `.Content` è **vuoto**: il comando
+> non fa nulla e fallisce in silenzio. La forma `irm … | iex` funziona perché in
+> quel caso la pipeline passa il testo a `Invoke-Expression`.
+>
+> > [!NOTE]
+> > **In PowerShell il pipe funziona anche in interattivo**, al contrario di
+> > bash: lo stdin non viene toccato, quindi le prompt leggono le tue risposte.
 
 ### Configurazione remota, senza domande
 
@@ -89,7 +95,7 @@ Per il provisioning — un server, un container, un'installazione non presidiata
 gli stessi script girano in non interattivo.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.sh \
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.3/pi-conf.sh \
   | bash -s -- add \
       --endpoint https://api.server.example \
       --api anthropic \
@@ -99,7 +105,7 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2
 ```
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1).Content)) add `
+& ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.3/pi-conf.ps1'))) add `
     -Endpoint https://api.server.example -Api anthropic -Model MLR-3 -KeyEnv MLR_API_KEY -Yes
 ```
 
@@ -113,7 +119,7 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2
 > il pipe è invece la scelta giusta, perché `add` non legge mai stdin.
 
 > [!TIP]
-> **Pinna la versione.** Gli esempi qui usano il tag `v0.4.2`. Sostituiscilo
+> **Pinna la versione.** Gli esempi qui usano il tag `v0.4.3`. Sostituiscilo
 > con `main` solo se segui deliberatamente la versione di sviluppo: `main` può
 > cambiare in qualsiasi momento.
 
@@ -165,17 +171,17 @@ metterlo nel `PATH`:
 
 ```bash
 # macOS / Linux
-curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.sh
+curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.3/pi-conf.sh
 ```
 
 ```powershell
 # Windows
-irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1
+irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.3/pi-conf.ps1
 ```
 
 > [!TIP]
 > **Pinna la versione.** `main` può cambiare in qualsiasi momento, un tag no.
-> Sostituisci `v0.4.2` con il tag che ti serve.
+> Sostituisci `v0.4.3` con il tag che ti serve.
 
 ### Lancia
 
@@ -202,7 +208,7 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/i
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex
+& ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1')))
 ```
 
 Installa in `~/.local/bin` (Windows: `%USERPROFILE%\.pi-configurator`) e verifica
@@ -238,17 +244,17 @@ flag e le procedure sono definiti li', non improvvisarli.
 
 Procedura, senza deviazioni:
 
-1. Scarica install-provider.sh dal TAG v0.4.2, mai da main, in una directory
+1. Scarica install-provider.sh dal TAG v0.4.3, mai da main, in una directory
    temporanea. Pinna il tag: main puo' cambiare in qualsiasi momento.
 2. Verifica lo SHA256 del file scaricato confrontandolo con la voce in
-   SHA256SUMS scaricata dallo STESSO ref (v0.4.2), non da main. Se non
+   SHA256SUMS scaricata dallo STESSO ref (v0.4.3), non da main. Se non
    corrisponde, FERMATI e segnalalo. Non usare --no-verify e non eseguire
    un file non verificato.
 3. Chiedimi solo cio' che non puoi dedurre: endpoint, model id, e il nome della
    variabile d'ambiente che contiene la API key. Non chiedermi la chiave in
    chiaro.
 4. Esegui l'installer con:
-       --ref v0.4.2
+       --ref v0.4.3
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -283,17 +289,17 @@ procedures are defined there, do not improvise them.
 
 Procedure, with no deviations:
 
-1. Download install-provider.sh from the TAG v0.4.2, never from main, into a
+1. Download install-provider.sh from the TAG v0.4.3, never from main, into a
    temporary directory. Pin the tag: main can change at any moment.
 2. Verify the SHA256 of the downloaded file against the entry in SHA256SUMS
-   fetched from the SAME ref (v0.4.2), not from main. If it does not match,
+   fetched from the SAME ref (v0.4.3), not from main. If it does not match,
    STOP and report it. Do not use --no-verify, and never run a file you have
    not verified.
 3. Ask me only for what you cannot infer: endpoint, model id, and the name of
    the environment variable holding the API key. Do not ask me for the key in
    clear.
 4. Run the installer with:
-       --ref v0.4.2
+       --ref v0.4.3
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -479,12 +485,8 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/i
 ```
 
 ```powershell
-irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1 | iex -args @(
-    '-Endpoint','https://api.server.example',
-    '-Api','anthropic',
-    '-Model','MLR-3',
-    '-KeyEnv','MLR_API_KEY'
-)
+& ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1'))) `
+    -Endpoint https://api.server.example -Api anthropic -Model MLR-3 -KeyEnv MLR_API_KEY
 ```
 
 <details>
@@ -562,15 +564,16 @@ Entrambi richiedono ovviamente `pi` installato e un `~/.pi/agent/` scrivibile.
 bash tests/pi-conf-test.sh
 ```
 
-**140 asserzioni in 16 sezioni** su `pi-conf.sh`, `install.sh` e
-`install-provider.sh`: merge non distruttivo, backup, mascheratura dell'anteprima,
-permessi del file, modalità non interattiva, `sanitize_name`, i due installer e
-una guardia che verifica che la suite non abbia mai toccato il
-`models.json` reale.
+**143 asserzioni** su `pi-conf.sh`, `install.sh` e `install-provider.sh`: merge
+non distruttivo, backup, mascheratura dell'anteprima, permessi del file,
+modalità non interattiva, `sanitize_name`, i due installer, lo stdin chiuso e
+una guardia che verifica che la suite non abbia mai toccato il `models.json`
+reale.
 
-**`pi-conf.ps1` viene eseguito davvero** dalla §16, se `pwsh` è installato:
-sono altre **44 asserzioni** sulle tre forme degli argomenti, sugli errori e sul
-merge. Su una macchina senza PowerShell restano i controlli statici.
+**I tre script PowerShell vengono eseguiti davvero** dalla §16, se `pwsh` è
+installato: sono altre **60 asserzioni** sulle tre forme degli argomenti, sugli
+errori, sull'`input`, sul merge, sullo stdin chiuso e sui due installer. Su una
+macchina senza PowerShell restano i controlli statici.
 
 La suite è stata verificata **per sabotaggio**: disabilitando la verifica
 SHA256 dell'installer, il trim dei trattini in `sanitize_name`, la scrittura di
@@ -579,9 +582,12 @@ la guardia `has("apiKey")`, la preservazione di `input` nel merge, il default
 di `input` forzato incondizionatamente, la validazione di `--input`, la
 preservazione di `input` in PowerShell, il chiamato `Get-AddOptions -Args` in
 `pi-conf.ps1`, l'`input` forzato a `["text"]` in `pi-conf.ps1` e il
-`ConvertFrom-Json` su un ordered dictionary in `pi-conf.ps1` e l'anteprima del
-dry-run che mostra il provider grezzo invece del risultato del merge, la suite
-**fallisce** in tutti e tredici i casi.
+`ConvertFrom-Json` su un ordered dictionary in `pi-conf.ps1`, l'anteprima del
+dry-run che mostra il provider grezzo invece del risultato del merge, il
+gestione dello stdin chiuso in `pi-conf.sh`, la stessa gestione in
+`pi-conf.ps1`, il fallback su `$HOME` quando `$env:USERPROFILE` non esiste e il
+passaggio degli argomenti per posizione in `install-provider.ps1`, la suite
+**fallisce** in tutti e diciassette i casi.
 
 Un sabotaggio ha rivelato un test che passava per il motivo sbagliato: il
 percorso interattivo scrive sempre un `input` **esplicito**, quindi non
@@ -617,13 +623,15 @@ arrivava mai al merge. Il test che ora lo copre passa da `add` senza
 - **Nessun backup quando il file non esiste**: sul primo salvataggio non c'è
   nulla da conservare. E il backup viene sovrascritto a ogni esecuzione.
 - **`cost` resta a zero** finché non lo editi a mano.
-- **Nessuna CI**: la suite passa solo se qualcuno la lancia.
+- **Nessuna CI**: la suite passa solo se qualcuno la lancia. La §16 richiede
+  `pwsh` installato: su una macchina senza PowerShell il ramo Windows non
+  viene eseguito affatto.
 
 ---
 
 <div align="center">
 
-**MIT** · [EULA v1.3](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.4.2`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
+**MIT** · [EULA v1.3](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.4.3`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <b>Italiano</b> · 🇬🇧 <a href="README.en.md">English</a></sub>
 

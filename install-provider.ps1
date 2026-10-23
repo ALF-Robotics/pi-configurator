@@ -96,14 +96,25 @@ $cleanup = { if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp -ErrorAction
 
 try {
     $delegate = Join-Path $tmp 'install.ps1'
-    Write-Step 'Installer delegato: download'
-    Write-Info "$Raw/install.ps1"
-    Invoke-WebRequest -Uri "$Raw/install.ps1" -OutFile $delegate -UseBasicParsing
+    if (Test-Path './install.ps1') {
+        # checkout locale: l'installer delegato e' gia' qui (come in
+        # install-provider.sh), niente rete e hash presi da SHA256SUMS locale
+        Write-Step 'Installer delegato: copia dal checkout locale'
+        Copy-Item './install.ps1' $delegate -Force
+    } else {
+        Write-Step 'Installer delegato: download'
+        Write-Info "$Raw/install.ps1"
+        Invoke-WebRequest -Uri "$Raw/install.ps1" -OutFile $delegate -UseBasicParsing
+    }
 
     if (-not $NoVerify) {
         $sumsPath = Join-Path $tmp 'SHA256SUMS'
         try {
-            Invoke-WebRequest -Uri "$Raw/SHA256SUMS" -OutFile $sumsPath -UseBasicParsing -ErrorAction Stop
+            if (Test-Path './SHA256SUMS') {
+                Copy-Item './SHA256SUMS' $sumsPath -Force
+            } else {
+                Invoke-WebRequest -Uri "$Raw/SHA256SUMS" -OutFile $sumsPath -UseBasicParsing -ErrorAction Stop
+            }
             $want = $null
             foreach ($line in (Get-Content $sumsPath)) {
                 if ($line -match '^\s*([0-9a-fA-F]{64})\s+\*?install\.ps1\s*$') { $want = $Matches[1] }
@@ -124,9 +135,12 @@ try {
     }
 
     # --- installazione, delegata --------------------------------------------
-    $installerArgs = @('-Ref', $Ref, '-Prefix', $Prefix)
-    if ($NoVerify) { $installerArgs += '-NoVerify' }
-    if ($DryRun)   { $installerArgs += '-DryRun' }
+    # Splattare un array di stringhe passa gli argomenti in modo POSIZIZIONALE:
+    # '-Ref' finirebbe nel primo parametro. Con una hashtable ogni chiave e'
+    # un parametro nominato.
+    $installerArgs = @{ Ref = $Ref; Prefix = $Prefix }
+    if ($NoVerify) { $installerArgs['NoVerify'] = $true }
+    if ($DryRun)   { $installerArgs['DryRun'] = $true }
     & $delegate @installerArgs
 
     if ($DryRun) {
@@ -137,7 +151,8 @@ try {
 
     # --- configurazione -------------------------------------------------------
     Write-Step 'Configurazione del provider'
-    & (Join-Path $Prefix 'pi-conf.ps1') @providerArgs
+    # pi-conf.ps1 raccoglie gli argomenti non interattivi in -Rest
+    & (Join-Path $Prefix 'pi-conf.ps1') -Rest $providerArgs
 
     Write-Step 'Fatto'
     Write-Host "  Tool:   $Prefix\pi-conf.ps1"

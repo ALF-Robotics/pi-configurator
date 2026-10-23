@@ -30,7 +30,12 @@ if (-not $PiConfFile) {
     if ($env:PI_CODING_AGENT_DIR) {
         $PiConfFile = Join-Path $env:PI_CODING_AGENT_DIR 'models.json'
     } else {
-        $PiConfFile = Join-Path $env:USERPROFILE '.pi\agent\models.json'
+        # $env:USERPROFILE esiste solo su Windows. Su macOS/Linux con pwsh
+        # manca e Join-Path su un path nullo va in errore: si cade su $HOME.
+        $homeDir = $env:USERPROFILE
+        if (-not $homeDir) { $homeDir = $env:HOME }
+        if (-not $homeDir) { $homeDir = [Environment]::GetFolderPath('UserProfile') }
+        $PiConfFile = Join-Path (Join-Path (Join-Path $homeDir '.pi') 'agent') 'models.json'
     }
 }
 
@@ -102,11 +107,13 @@ function Get-PromptInput {
     if ($Default) {
         Write-Host -NoNewline ("$Label [$Default]: ")
         $value = Read-Host
+        if ($null -eq $value) { Stop-EOF "una risposta" }
         if ([string]::IsNullOrWhiteSpace($value)) { $value = $Default }
     } else {
         while ($true) {
             Write-Host -NoNewline "$Label`: "
             $value = Read-Host
+            if ($null -eq $value) { Stop-EOF "una risposta" }
             if (-not [string]::IsNullOrWhiteSpace($value)) { break }
             Write-Host "  (!) richiesto" -ForegroundColor Yellow
         }
@@ -116,12 +123,28 @@ function Get-PromptInput {
 
 # Legge un secret mostrando '*' per ogni carattere (anche durante paste).
 # Usa [Console]::ReadKey per controllo char-by-char.
+# Esce con un errore esplicito quando lo stdin e' chiuso (EOF): senza questo
+# controllo una prompt gira all'infinito su un input vuoto, tipico di un
+# one-liner eseguito senza terminale.
+function Stop-EOF {
+    param([string]$Cosa = 'una risposta')
+    Write-Host ''
+    Write-Host "Errore: stdin chiuso (EOF) mentre si chiedeva ${Cosa}: non c'e' niente da leggere." -ForegroundColor Red
+    exit 1
+}
+
 function Read-SecretWithStars {
     param([string]$Prompt)
     Write-Host -NoNewline $Prompt
     $value = ''
     while ($true) {
-        $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        $key = $null
+        try {
+            $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        } catch {
+            Stop-EOF 'la API key'
+        }
+        if ($null -eq $key) { Stop-EOF 'la API key' }
         if ($key.Key -eq 'Enter') {
             Write-Host ''
             break
@@ -150,6 +173,7 @@ function Get-PromptYN {
     while ($true) {
         Write-Host -NoNewline "$Label $suffix`: "
         $value = Read-Host
+        if ($null -eq $value) { Stop-EOF "una risposta" }
         if ([string]::IsNullOrWhiteSpace($value)) { $value = $Default }
         switch ($value.ToLower().Trim()) {
             'y'     { return 'y' }
