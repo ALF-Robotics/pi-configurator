@@ -90,6 +90,41 @@ chmod +x pi-conf.sh
 > **`jq` is required** (on macOS: `brew install jq`). On Windows nothing is
 > needed: `pi-conf.ps1` uses native cmdlets only.
 
+### In a single line
+
+If you would rather not download the file, you can run the script straight
+from the web.
+
+**Interactive**, with the prompts working:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/pi-conf.sh)"
+```
+
+**Remote configuration**, without questions:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/pi-conf.sh \
+  | bash -s -- add \
+      --endpoint https://api.server.example \
+      --api anthropic \
+      --model MLR-3 \
+      --key-env MLR_API_KEY \
+      --yes
+```
+
+To pin the version, replace `main` with the tag in the URL:
+`.../pi-configurator/v0.4.0/pi-conf.sh`.
+
+> [!WARNING]
+> **`curl … | bash` does not work interactively.** With the pipe, stdin holds
+> the script's own text, so the prompts read the script instead of your
+> answers: the configuration is never written.
+>
+> That is why the interactive form uses `bash -c "…"`: the script arrives as a
+> command string and stdin stays the terminal. In the non-interactive form the
+> pipe is the right choice, because `add` never reads stdin.
+
 ### What happens
 
 The script asks you 9 things — endpoint, API standard, model id, profile name,
