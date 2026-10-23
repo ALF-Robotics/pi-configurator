@@ -43,11 +43,11 @@
 
 ## 📋 Table of contents
 
-- [Quick install](#-quick-install)
-- [Let your AI set it up](#-let-your-ai-set-it-up)
-- [What it does](#-what-it-does)
+- [Quick install](#-quick-install) — the recommended way, interactive
+- [Let your AI set it up](#-let-your-ai-set-it-up) — if you prefer an assistant to do it
+- [What it does](#-what-it-does) — the 9 questions, one by one
 - [How the merge works](#-how-the-merge-works)
-- [Non-interactive use](#-non-interactive-use)
+- [Non-interactive use](#-non-interactive-use) — for provisioning and scripts
 - [Dependencies](#-dependencies)
 - [Security](#-security)
 - [Tests](#-tests)
@@ -57,19 +57,92 @@
 
 ## 🚀 Quick install
 
-**Tool only**, if you will then use it by hand or interactively:
+The **recommended** way is interactive: run `pi-conf.sh` and answer 9 questions.
+The script does the merge by itself, leaves a backup and runs the final check.
+
+### 1. Install the tool
 
 ```bash
-# macOS / Linux
+# macOS / Linux — installs into ~/.local/bin
 curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh | sh
 ```
 
 ```powershell
-# Windows
+# Windows — installs into %USERPROFILE%\.pi-configurator
 irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex
 ```
 
-**Tool and provider together**, for provisioning:
+Or, without installing anything, download the single script:
+
+```bash
+curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.sh
+chmod +x pi-conf.sh
+```
+
+Or clone the repository, if you also want the tests:
+
+```bash
+git clone https://github.com/ALF-Robotics/pi-configurator.git
+cd pi-configurator
+```
+
+> [!TIP]
+> **Pin the version.** `main` can change at any moment, a tag cannot:
+> `curl -fsSL .../main/install.sh | sh -s -- --ref v0.4.0`
+>
+> Every downloaded file is verified with its **SHA256** before being written:
+> if the hash does not match, the install stops without touching anything.
+
+### 2. Create the profile interactively
+
+```bash
+pi-conf.sh
+```
+
+```powershell
+.\pi-conf.ps1
+```
+
+The script asks you 9 things — endpoint, API standard, model id, profile name,
+API key, reasoning, context window, max output tokens, multimodal — and then:
+
+1. prints the JSON preview, with the `apiKey` **masked**
+2. if the profile already exists, asks for overwrite confirmation
+3. asks for final confirmation
+4. merges with `jq` (bash) or `ConvertFrom-Json`/`ConvertTo-Json` (PowerShell)
+   and writes `~/.pi/agent/models.json` with mode `600`, after creating the
+   backup in `models.json.bak`
+5. runs `pi auth check --provider <name> --json` to verify
+
+The 9 questions one by one are in [What it does](#-what-it-does).
+
+> [!TIP]
+> **The API key is optional.** Leave it empty and the profile is created
+> without a credential, which you can configure later with `/login <name>` or
+> with an environment variable. Either way the preview shows the key
+> **masked** (`••••••••` plus the last 4 digits): the clear value only reaches
+> the file.
+
+<details>
+<summary><b>If PowerShell blocks the script (<i>execution policy</i>)</b></summary>
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+or, for that single run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\pi-conf.ps1
+```
+
+</details>
+
+### For automation: no questions
+
+If you need to configure the provider **without interaction** — provisioning,
+scripts, CI — use `install-provider.sh`, which installs and configures in a
+single invocation:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.sh \
@@ -80,42 +153,26 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/i
       --key-env MLR_API_KEY
 ```
 
-It installs into `~/.local/bin` (Windows: `%USERPROFILE%\.pi-configurator`) and
-verifies every downloaded file with its **SHA256** before writing: if the hash
-does not match, the install stops without touching anything.
-
-> [!TIP]
-> **Pin the version.** `main` can change at any moment, a tag cannot:
-> `curl -fsSL .../main/install.sh | sh -s -- --ref v0.4.0`
+If you already have the tool installed, `pi-conf.sh add` takes the same flags.
+All the details are in [Non-interactive use](#-non-interactive-use).
 
 <details>
-<summary><b>Windows installer (PowerShell), full options</b></summary>
-
-```powershell
-irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1 | iex -args @(
-    '-Endpoint','https://api.server.example',
-    '-Api','anthropic',
-    '-Model','MLR-3',
-    '-KeyEnv','MLR_API_KEY'
-)
-```
-
-</details>
-
-### Installer options
+<summary><b>Installer options</b></summary>
 
 | Installer | Role | Provider flags |
 |---|---|---|
 | `install.sh` / `install.ps1` | download and verify the tool | after `--` |
 | `install-provider.sh` / `.ps1` | install **and** configure | top-level, no `--` |
 
-Both accept `--ref`, `--prefix`, `--dry-run`, `--no-verify`.
+Both accept `--ref`, `--prefix`, `--dry-run` and `--no-verify`.
 `install-provider` additionally accepts the provider flags (`--endpoint`,
 `--model`, `--key-env`, …) and **rejects** a missing `--endpoint` or `--model`
 *before* installing anything.
 
 `install-provider` also verifies the hash of `install.sh` before running it: that
 is code about to execute, not just a file to drop into `/usr/local/bin`.
+
+</details>
 
 ---
 
@@ -268,14 +325,6 @@ and backspace works normally.
 > reasoning at `y` (the default) it would cut your long answers off **silently,
 > with no error**.
 
-### Final flow
-
-1. Prints a JSON preview of the provider
-2. If the profile name already exists → asks for overwrite confirmation
-3. Asks for final confirmation
-4. Merges with `jq` (bash) or `ConvertFrom-Json`/`ConvertTo-Json` (PowerShell)
-5. Runs `pi auth check --provider <name> --json` to verify
-
 ---
 
 ## 🔀 How the merge works
@@ -370,36 +419,6 @@ pi-conf.sh add \
 > environment on every request, so the credential **never lands in clear** in
 > `models.json`. If the variable is not set when pi starts, the provider will
 > show as unauthenticated.
-
-### Interactive use
-
-```bash
-# from the repo directory
-chmod +x pi-conf.sh
-./pi-conf.sh
-./pi-conf.sh --help
-```
-
-```powershell
-# from PowerShell
-.\pi-conf.ps1
-.\pi-conf.ps1 -Help
-```
-
-<details>
-<summary><b>If PowerShell blocks the script (<i>execution policy</i>)</b></summary>
-
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-```
-
-or, for that single run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\pi-conf.ps1
-```
-
-</details>
 
 ### Environment variables
 

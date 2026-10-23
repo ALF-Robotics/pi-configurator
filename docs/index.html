@@ -77,7 +77,7 @@
     <span class="pill">MIT</span><span class="pill">EULA v1.3</span>
   </p>
 
-  <h2>Installa</h2>
+  <h2>1. Installa il tool</h2>
 
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true"  data-t="unix">macOS / Linux</button>
@@ -104,10 +104,26 @@
     scrivere nulla.
   </div>
 
-  <h2>Configura un provider</h2>
+  <h2>2. Crea il profilo in interattivo</h2>
   <p class="lede">
-    Senza una riga di comando, senza prompt, e <strong>senza scrivere la chiave
-    in chiaro</strong> nel file di configurazione.
+    Il modo consigliato: lancia lo script e rispondi a 9 domande. Fa il merge
+    da solo, lascia un backup e verifica il risultato.
+  </p>
+
+  <div class="panel">
+    <pre><button class="copy" data-c="conf">copia</button><code>pi-conf.sh</code></pre>
+    <p class="lede" style="margin:0">
+      Lo script chiede endpoint, standard API, model id, nome del profilo, API key,
+      reasoning, context window, max output tokens e multimodale; poi mostra
+      l'anteprima con la chiave <strong>mascherata</strong> e scrive
+      <code>models.json</code> con mode <code>600</code> dopo averne creato il backup.
+    </p>
+  </div>
+
+  <h2>Configura un provider senza domande</h2>
+  <p class="lede">
+    Per provisioning e script: nessuna riga di comando, nessun prompt, e
+    <strong>senza scrivere la chiave in chiaro</strong> nel file di configurazione.
   </p>
 
   <div class="panel">
@@ -190,6 +206,12 @@
       <td>File illeggibile</td>
       <td>Se <code>models.json</code> non è JSON valido, nessuna delle due
           implementazioni scrive: si fermano e segnalano.</td>
+    </tr>
+    <tr>
+      <td>Interattivo</td>
+      <td><code>pi-conf.sh</code> fa 9 domande, mostra l'anteprima con la chiave
+          mascherata, e solo dopo la conferma scrive il file. Il backup
+          <code>models.json.bak</code> precede sempre la scrittura.</td>
     </tr>
     <tr>
       <td>Verificato</td>
