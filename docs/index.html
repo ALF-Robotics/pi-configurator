@@ -77,7 +77,11 @@
     <span class="pill">MIT</span><span class="pill">EULA v1.3</span>
   </p>
 
-  <h2>1. Installa il tool</h2>
+  <h2>1. Scarica <code>pi-conf.sh</code></h2>
+  <p class="lede">
+    È lo script che configura pi. Scaricalo e lancialo: niente da installare,
+    niente da mettere nel <code>PATH</code>.
+  </p>
 
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true"  data-t="unix">macOS / Linux</button>
@@ -86,95 +90,29 @@
 
   <div class="panel">
     <div id="unix">
-      <pre><button class="copy" data-c="curl">copia</button><code>curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh | sh</code></pre>
-      <p class="lede" style="margin:0">Installa in <code>~/.local/bin</code>. Aggiungi quella cartella al <code>PATH</code> se non c'è già.</p>
+      <pre><button class="copy" data-c="dl">copia</button><code>curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.sh
+chmod +x pi-conf.sh
+./pi-conf.sh</code></pre>
     </div>
     <div id="win" hidden>
-      <pre><button class="copy" data-c="irm">copia</button><code>irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex</code></pre>
-      <p class="lede" style="margin:0">Installa in <code>%USERPROFILE%\.pi-configurator</code>.</p>
+      <pre><button class="copy" data-c="dlw">copia</button><code>irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.ps1
+.\pi-conf.ps1</code></pre>
     </div>
   </div>
 
   <div class="note">
     <strong>Pinna la versione.</strong> <code>main</code> può cambiare in qualsiasi
-    momento. Per un'installazione riproducibile usa un tag:
-    <code>... | sh -s -- --ref v0.4.0</code>
-    Ogni file scaricato viene verificato con lo SHA256 prima di essere
-    installato; se l'hash non corrisponde, l'installazione si ferma senza
-    scrivere nulla.
+    momento, un tag no. Sostituisci <code>v0.4.0</code> con il tag che ti serve.
   </div>
 
-  <h2>2. Crea il profilo in interattivo</h2>
+  <h2>2. Rispondi a 9 domande</h2>
   <p class="lede">
-    Il modo consigliato: lancia lo script e rispondi a 9 domande. Fa il merge
-    da solo, lascia un backup e verifica il risultato.
+    Lo script chiede endpoint, standard API, model id, nome del profilo, API key,
+    reasoning, context window, max output tokens e multimodale. Poi mostra
+    l'anteprima con la chiave <strong>mascherata</strong> e, solo dopo la tua
+    conferma, scrive <code>models.json</code> con mode <code>600</code> dopo averne
+    creato il backup.
   </p>
-
-  <div class="panel">
-    <pre><button class="copy" data-c="conf">copia</button><code>pi-conf.sh</code></pre>
-    <p class="lede" style="margin:0">
-      Lo script chiede endpoint, standard API, model id, nome del profilo, API key,
-      reasoning, context window, max output tokens e multimodale; poi mostra
-      l'anteprima con la chiave <strong>mascherata</strong> e scrive
-      <code>models.json</code> con mode <code>600</code> dopo averne creato il backup.
-    </p>
-  </div>
-
-  <h2>Configura un provider senza domande</h2>
-  <p class="lede">
-    Per provisioning e script: nessuna riga di comando, nessun prompt, e
-    <strong>senza scrivere la chiave in chiaro</strong> nel file di configurazione.
-  </p>
-
-  <div class="panel">
-    <pre><button class="copy" data-c="cfg">copia</button><code>pi-conf.sh add \
-  --endpoint https://api.server.example \
-  --api anthropic \
-  --model MLR-3 \
-  --key-env MLR_API_KEY \
-  --yes</code></pre>
-    <p class="lede" style="margin:0">
-      <code>--key-env</code> scrive <code>"apiKey": "$MLR_API_KEY"</code> nel file.
-      Pi la risolve dall'ambiente a ogni richiesta, quindi la credenziale non
-      finisce mai su disco in chiaro.
-    </p>
-  </div>
-
-  <h2>Installa e configura in un colpo</h2>
-  <p class="lede">
-    Per il provisioning c'è uno script dedicato: i parametri del provider sono
-    flag di primo livello, senza separatori da ricordare.
-  </p>
-
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" aria-selected="true"  data-t="p-unix">macOS / Linux</button>
-    <button class="tab" role="tab" aria-selected="false" data-t="p-win">Windows</button>
-  </div>
-
-  <div class="panel">
-    <div id="p-unix">
-      <pre><button class="copy" data-c="prov">copia</button><code>curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.sh \
-  | sh -s -- \
-      --endpoint https://api.server.example \
-      --api anthropic \
-      --model MLR-3 \
-      --key-env MLR_API_KEY</code></pre>
-    </div>
-    <div id="p-win" hidden>
-      <pre><button class="copy" data-c="provw">copia</button><code>irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1 | iex -args @(
-    '-Endpoint','https://api.server.example',
-    '-Api','anthropic',
-    '-Model','MLR-3',
-    '-KeyEnv','MLR_API_KEY'
-)</code></pre>
-    </div>
-  </div>
-
-  <div class="note ok">
-    Se manca <code>--endpoint</code> o <code>--model</code> lo script si ferma
-    <em>prima</em> di installare qualsiasi cosa, e verifica con SHA256
-    l'installer che sta per eseguire.
-  </div>
 
   <h2>Cosa garantisce</h2>
   <table>
@@ -234,6 +172,62 @@
     <strong>Attenzione.</strong> <code>maxTokens</code> comprende i token di
     ragionamento. Con reasoning attivo i 32768 sono il budget di ragionamento
     <em>più</em> risposta: è il motivo per cui il default non è più basso.
+  </div>
+
+  <h2>Per l'automazione</h2>
+  <p class="lede">
+    Per provisioning e script: nessuna domanda, e <strong>senza scrivere la chiave
+    in chiaro</strong> nel file di configurazione.
+  </p>
+
+  <div class="panel">
+    <pre><button class="copy" data-c="cfg">copia</button><code>pi-conf.sh add \
+  --endpoint https://api.server.example \
+  --api anthropic \
+  --model MLR-3 \
+  --key-env MLR_API_KEY \
+  --yes</code></pre>
+    <p class="lede" style="margin:0">
+      <code>--key-env</code> scrive <code>"apiKey": "$MLR_API_KEY"</code> nel file.
+      Pi la risolve dall'ambiente a ogni richiesta, quindi la credenziale non
+      finisce mai su disco in chiaro.
+    </p>
+  </div>
+
+  <h2>Installa e configura in un colpo</h2>
+  <p class="lede">
+    Per il provisioning c'è uno script dedicato: i parametri del provider sono
+    flag di primo livello, senza separatori da ricordare.
+  </p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true"  data-t="p-unix">macOS / Linux</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="p-win">Windows</button>
+  </div>
+
+  <div class="panel">
+    <div id="p-unix">
+      <pre><button class="copy" data-c="prov">copia</button><code>curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.sh \
+  | sh -s -- \
+      --endpoint https://api.server.example \
+      --api anthropic \
+      --model MLR-3 \
+      --key-env MLR_API_KEY</code></pre>
+    </div>
+    <div id="p-win" hidden>
+      <pre><button class="copy" data-c="provw">copia</button><code>irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1 | iex -args @(
+    '-Endpoint','https://api.server.example',
+    '-Api','anthropic',
+    '-Model','MLR-3',
+    '-KeyEnv','MLR_API_KEY'
+)</code></pre>
+    </div>
+  </div>
+
+  <div class="note ok">
+    Se manca <code>--endpoint</code> o <code>--model</code> lo script si ferma
+    <em>prima</em> di installare qualsiasi cosa, e verifica con SHA256
+    l'installer che sta per eseguire.
   </div>
 
   <h2>Opzioni dell'installer</h2>

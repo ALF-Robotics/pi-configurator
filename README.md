@@ -40,7 +40,7 @@
 
 ## 📋 Indice
 
-- [Installazione rapida](#-installazione-rapida) — il modo consigliato, interattivo
+- [Installazione rapida](#-installazione-rapida) — scarica `pi-conf.sh` e lancialo
 - [Let your AI set it up](#-let-your-ai-set-it-up) — se preferisci che lo faccia un assistente
 - [Cosa fa](#-cosa-fa) — le 9 domande, una per una
 - [Come funziona il merge](#-come-funziona-il-merge)
@@ -54,51 +54,40 @@
 
 ## 🚀 Installazione rapida
 
-Il modo **consigliato** è interattivo: lanci `pi-conf.sh` e rispondi a 9 domande.
-Lo script fa il merge da solo, lascia un backup e lancia la verifica finale.
+`pi-conf.sh` è lo script che configura pi. Scaricalo e lancialo.
 
-### 1. Installa il tool
+### Scarica
 
 ```bash
-# macOS / Linux — installa in ~/.local/bin
-curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh | sh
+# macOS / Linux
+curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.sh
 ```
 
 ```powershell
-# Windows — installa in %USERPROFILE%\.pi-configurator
-irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex
-```
-
-Oppure, senza installare nulla, scarica il singolo script:
-
-```bash
-curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.sh
-chmod +x pi-conf.sh
-```
-
-Oppure clona il repository, se vuoi anche i test:
-
-```bash
-git clone https://github.com/ALF-Robotics/pi-configurator.git
-cd pi-configurator
+# Windows
+irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.ps1
 ```
 
 > [!TIP]
-> **Pinna la versione.** `main` può cambiare in qualsiasi momento, un tag no:
-> `curl -fsSL .../main/install.sh | sh -s -- --ref v0.4.0`
->
-> Ogni file scaricato viene verificato con lo **SHA256** prima di essere
-> scritto: se l'hash non corrisponde l'installazione si ferma senza toccare nulla.
+> **Pinna la versione.** `main` può cambiare in qualsiasi momento, un tag no.
+> Sostituisci `v0.4.0` con il tag che ti serve.
 
-### 2. Crea il profilo in interattivo
+### Lancia
 
 ```bash
-pi-conf.sh
+chmod +x pi-conf.sh
+./pi-conf.sh
 ```
 
 ```powershell
 .\pi-conf.ps1
 ```
+
+> [!NOTE]
+> **Serve `jq`** (su macOS: `brew install jq`). Su Windows non serve niente:
+> `pi-conf.ps1` usa solo cmdlets nativi.
+
+### Cosa succede
 
 Lo script ti chiede 9 cose — endpoint, standard API, model id, nome del profilo,
 API key, reasoning, context window, max output tokens, multimodale — e poi:
@@ -134,38 +123,29 @@ powershell -ExecutionPolicy Bypass -File .\pi-conf.ps1
 
 </details>
 
-### Per l'automazione: senza domande
+<details>
+<summary><b>Altre modalità (opzionale)</b></summary>
 
-Se devi configurare il provider **senza interazione** — provisioning, script, CI —
-usa `install-provider.sh`, che installa e configura in una sola invocazione:
+Per installare il tool nel `PATH` invece di scaricarlo a mano:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.sh \
-  | sh -s -- \
-      --endpoint https://api.server.example \
-      --api anthropic \
-      --model MLR-3 \
-      --key-env MLR_API_KEY
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.sh | sh
 ```
 
-Se hai già il tool installato, basta `pi-conf.sh add` con gli stessi flag.
-Tutti i dettagli sono in [Uso non interattivo](#-uso-non-interattivo).
+```powershell
+irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install.ps1 | iex
+```
 
-<details>
-<summary><b>Opzioni degli installer</b></summary>
+Installa in `~/.local/bin` (Windows: `%USERPROFILE%\.pi-configurator`) e verifica
+ogni file scaricato con lo **SHA256** prima di scrivere: se l'hash non corrisponde
+l'installazione si ferma senza toccare nulla.
 
-| Installer | Ruolo | Flag del provider |
-|---|---|---|
-| `install.sh` / `install.ps1` | scarica e verifica il tool | dopo `--` |
-| `install-provider.sh` / `.ps1` | installa **e** configura | di primo livello, senza `--` |
+Oppure clona il repository, se vuoi anche i test:
 
-Entrambi accettano `--ref`, `--prefix`, `--dry-run` e `--no-verify`.
-`install-provider` accetta in più i flag del provider (`--endpoint`, `--model`,
-`--key-env`, …) e **rifiuta** un `--endpoint` o `--model` mancante *prima* di
-installare qualsiasi cosa.
-
-`install-provider` verifica anche l'hash di `install.sh` prima di eseguirlo:
-è codice che sta per girare, non un semplice file da mettere in `/usr/local/bin`.
+```bash
+git clone https://github.com/ALF-Robotics/pi-configurator.git
+cd pi-configurator
+```
 
 </details>
 
@@ -413,6 +393,47 @@ pi-conf.sh add \
 > a ogni richiesta, quindi la credenziale **non finisce mai in chiaro** in
 > `models.json`. Se la variabile non è impostata quando parte pi, il provider
 > risulta non autenticato.
+
+### Installa e configura in una riga
+
+Se vuoi fare tutto in un colpo — installare il tool **e** configurare il
+provider senza domande — c'è `install-provider.sh`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.sh \
+  | sh -s -- \
+      --endpoint https://api.server.example \
+      --api anthropic \
+      --model MLR-3 \
+      --key-env MLR_API_KEY
+```
+
+```powershell
+irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/install-provider.ps1 | iex -args @(
+    '-Endpoint','https://api.server.example',
+    '-Api','anthropic',
+    '-Model','MLR-3',
+    '-KeyEnv','MLR_API_KEY'
+)
+```
+
+<details>
+<summary><b>Opzioni degli installer</b></summary>
+
+| Installer | Ruolo | Flag del provider |
+|---|---|---|
+| `install.sh` / `install.ps1` | scarica e verifica il tool | dopo `--` |
+| `install-provider.sh` / `.ps1` | installa **e** configura | di primo livello, senza `--` |
+
+Entrambi accettano `--ref`, `--prefix`, `--dry-run` e `--no-verify`.
+`install-provider` accetta in più i flag del provider (`--endpoint`, `--model`,
+`--key-env`, …) e **rifiuta** un `--endpoint` o `--model` mancante *prima* di
+installare qualsiasi cosa.
+
+`install-provider` verifica anche l'hash di `install.sh` prima di eseguirlo:
+è codice che sta per girare, non un semplice file da mettere in `/usr/local/bin`.
+
+</details>
 
 ### Variabili d'ambiente
 
