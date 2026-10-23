@@ -86,7 +86,7 @@ does not match, the install stops without touching anything.
 
 > [!TIP]
 > **Pin the version.** `main` can change at any moment, a tag cannot:
-> `curl -fsSL .../main/install.sh | sh -s -- --ref v0.3.0`
+> `curl -fsSL .../main/install.sh | sh -s -- --ref v0.4.0`
 
 <details>
 <summary><b>Windows installer (PowerShell), full options</b></summary>
@@ -136,17 +136,17 @@ procedures are defined there, do not improvise them.
 
 Procedure, with no deviations:
 
-1. Download install-provider.sh from the TAG v0.3.1, never from main, into a
+1. Download install-provider.sh from the TAG v0.4.0, never from main, into a
    temporary directory. Pin the tag: main can change at any moment.
 2. Verify the SHA256 of the downloaded file against the entry in SHA256SUMS
-   fetched from the SAME ref (v0.3.1), not from main. If it does not match,
+   fetched from the SAME ref (v0.4.0), not from main. If it does not match,
    STOP and report it. Do not use --no-verify, and never run a file you have
    not verified.
 3. Ask me only for what you cannot infer: endpoint, model id, and the name of
    the environment variable holding the API key. Do not ask me for the key in
    clear.
 4. Run the installer with:
-       --ref v0.3.1
+       --ref v0.4.0
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -181,17 +181,17 @@ flag e le procedure sono definiti li', non improvvisarli.
 
 Procedura, senza deviazioni:
 
-1. Scarica install-provider.sh dal TAG v0.3.1, mai da main, in una directory
+1. Scarica install-provider.sh dal TAG v0.4.0, mai da main, in una directory
    temporanea. Pinna il tag: main puo' cambiare in qualsiasi momento.
 2. Verifica lo SHA256 del file scaricato confrontandolo con la voce in
-   SHA256SUMS scaricata dallo STESSO ref (v0.3.1), non da main. Se non
+   SHA256SUMS scaricata dallo STESSO ref (v0.4.0), non da main. Se non
    corrisponde, FERMATI e segnalalo. Non usare --no-verify e non eseguire
    un file non verificato.
 3. Chiedimi solo cio' che non puoi dedurre: endpoint, model id, e il nome della
    variabile d'ambiente che contiene la API key. Non chiedermi la chiave in
    chiaro.
 4. Esegui l'installer con:
-       --ref v0.3.1
+       --ref v0.4.0
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -506,7 +506,7 @@ merge preservation. The test that now covers it goes through `add` without
 
 <div align="center">
 
-**MIT** · [EULA v1.3](EULA.en.md) ([IT](EULA.md)) · release [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 support page](https://alf-robotics.github.io/pi-configurator/)
+**MIT** · [EULA v1.3](EULA.en.md) ([IT](EULA.md)) · release [`v0.4.0`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 support page](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <a href="README.md">Italiano</a> · 🇬🇧 <b>English</b></sub>
 
