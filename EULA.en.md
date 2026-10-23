@@ -1,6 +1,6 @@
 # EULA — pi-configurator
 
-**Version 1.2 — 2026-10-06**
+**Version 1.3 — 2026-10-23**
 
 > 🇮🇹 [Italiano](EULA.md) · 🇬🇧 **English**
 
@@ -8,6 +8,12 @@
 > v1.1 of 2026-10-04. The Italian text is the authoritative version: in case of
 > any interpretive divergence, the Italian prevails (see § 12).
 
+> **1.2 → 1.3**: the document has been made **anonymous and reusable**. § 1 no
+> longer identifies the licensor: the Rights Holders are the placeholder
+> `<RIGHTS HOLDERS>`, as `<EMAIL>` and `<CITY>` already were. No identifying
+> data (VAT number, company name) appears any more. No substantive change to the
+> terms: § 5, § 9 and § 10 are unchanged.
+>
 > **1.1 → 1.2**: § 6.6 updated. The limit “`input: ["text"]` is fixed and does
 > not expose multimodal input” has been **resolved**: the script now writes
 > `input: ["text", "image"]` by default, accepts `--input` to choose explicitly,
@@ -44,6 +50,10 @@ End User License Agreement for the **pi-configurator** software.
 The Rights Holders may be one or more distinct entities. Every reference to "the
 Rights Holders" in this document refers **jointly** to all of them, co-holders of
 the same obligations.
+
+> This document is a **template**: the placeholders `<RIGHTS HOLDERS>`, `<EMAIL>`
+> and `<CITY>` must be completed before any commercial or contractual use. No
+> identifying data of the licensor is included in this version.
 
 ## 2. Acceptance
 
@@ -283,7 +293,8 @@ in the header. Substantive amendments — in particular those relating to § 9 a
 
 ---
 
-*Document drawn up on 2026-10-04, revision 1.2 on 2026-10-06; English translation on 2026-10-05. The
-placeholders `<EMAIL>` and `<CITY>` must be completed before circulation.
+*Document drawn up on 2026-10-04, revision 1.3 on 2026-10-23; English translation on 2026-10-05. The
+placeholders `<RIGHTS HOLDERS>`, `<EMAIL>` and `<CITY>` must be completed before
+circulation.
 Before using this EULA in a commercial or contractual context, it is advisable
 to have it reviewed by a qualified professional.*

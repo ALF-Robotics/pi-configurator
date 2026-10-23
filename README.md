@@ -12,7 +12,7 @@
 [![tag](https://img.shields.io/github/v/tag/ALF-Robotics/pi-configurator?style=flat&label=release)](https://github.com/ALF-Robotics/pi-configurator/releases)
 [![last-commit](https://img.shields.io/github/last-commit/ALF-Robotics/pi-configurator?style=flat)](https://github.com/ALF-Robotics/pi-configurator/commits/main)
 [![stars](https://img.shields.io/github/stars/ALF-Robotics/pi-configurator?style=flat&label=stars)](https://github.com/ALF-Robotics/pi-configurator/stargazers)
-[![EULA](https://img.shields.io/badge/EULA-v1.2-informational)](EULA.md)
+[![EULA](https://img.shields.io/badge/EULA-v1.3-informational)](EULA.md)
 [![EULA-en](https://img.shields.io/badge/EULA-EN-informational)](EULA.en.md)
 [![type](https://img.shields.io/badge/type-utility-blueviolet)](#-cosa-fa)
 [![target](https://img.shields.io/badge/target-pi%20%28pi--coding--agent%29-ff69d4)](https://pi.dev/)
@@ -504,7 +504,7 @@ senza `--input`, ed è quello che intercetta il sabotaggio.
 
 <div align="center">
 
-**MIT** · [EULA v1.2](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
+**MIT** · [EULA v1.3](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <b>Italiano</b> · 🇬🇧 <a href="README.en.md">English</a></sub>
 

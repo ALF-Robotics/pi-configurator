@@ -12,7 +12,7 @@
 [![tag](https://img.shields.io/github/v/tag/ALF-Robotics/pi-configurator?style=flat&label=release)](https://github.com/ALF-Robotics/pi-configurator/releases)
 [![last-commit](https://img.shields.io/github/last-commit/ALF-Robotics/pi-configurator?style=flat)](https://github.com/ALF-Robotics/pi-configurator/commits/main)
 [![stars](https://img.shields.io/github/stars/ALF-Robotics/pi-configurator?style=flat&label=stars)](https://github.com/ALF-Robotics/pi-configurator/stargazers)
-[![EULA](https://img.shields.io/badge/EULA-v1.2-informational)](EULA.en.md)
+[![EULA](https://img.shields.io/badge/EULA-v1.3-informational)](EULA.en.md)
 [![EULA-it](https://img.shields.io/badge/EULA-IT-informational)](EULA.md)
 [![type](https://img.shields.io/badge/type-utility-blueviolet)](#-what-it-does)
 [![target](https://img.shields.io/badge/target-pi%20%28pi--coding--agent%29-ff69d4)](https://pi.dev/)
@@ -506,7 +506,7 @@ merge preservation. The test that now covers it goes through `add` without
 
 <div align="center">
 
-**MIT** · [EULA v1.2](EULA.en.md) ([IT](EULA.md)) · release [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 support page](https://alf-robotics.github.io/pi-configurator/)
+**MIT** · [EULA v1.3](EULA.en.md) ([IT](EULA.md)) · release [`v0.3.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 support page](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <a href="README.md">Italiano</a> · 🇬🇧 <b>English</b></sub>
 

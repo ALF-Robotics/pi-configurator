@@ -1,6 +1,6 @@
 # EULA — pi-configurator
 
-**Versione 1.2 — 2026-10-06**
+**Versione 1.3 — 2026-10-23**
 
 > 🇮🇹 **Italiano** · 🇬🇧 [English](EULA.en.md)
 
@@ -9,6 +9,12 @@
 > di cortesia, priva di autonoma efficacia giuridica, e può divergere solo per
 > imprecisione di traduzione.
 
+> **1.2 → 1.3**: il documento è stato reso **anonimo e riutilizzabile**. Il § 1
+> non identifica più il licenziante: i Titolari dei diritti sono il segnaposto
+> `<TITOLARI>`, come già accadeva per `<EMAIL>` e `<CITTÀ>`. Non compare più
+> alcun dato identificativo (P.IVA, denominazione sociale). Nessuna modifica
+> sostanziale alle condizioni: § 5, § 9 e § 10 restano invariate.
+>
 > **1.1 → 1.2**: § 6.6 aggiornato. Il limite «`input: ["text"]` è fisso e non
 > espone l'input multimodale» è stato **risolto**: lo script ora scrive
 > `input: ["text", "image"]` per impostazione predefinita, accetta
@@ -42,9 +48,13 @@ Contratto di licenza utente finale per il software **pi-configurator**.
 | Licenza del codice | MIT — file `LICENSE` |
 | Contatto | `<EMAIL>` |
 
-I Titolari possono essere uno o piu' soggetti distinti. Ogni riferimento a "i
+I Titolari possono essere uno o più soggetti distinti. Ogni riferimento a "i
 Titolari" in questo documento si riferisce **congiuntamente** a tutti coloro che
 ne fanno parte, co-titolari delle medesime obbligazioni.
+
+> Questo documento è un **modello**: i segnaposto `<TITOLARI>`, `<EMAIL>` e
+> `<CITTÀ>` vanno completati prima di qualsiasi uso commerciale o contrattuale.
+> Nessun dato identificativo del licenziante è incluso in questa versione.
 
 ## 2. Accettazione
 
@@ -288,7 +298,7 @@ quelle relative a § 9 e § 10 — richiedono una nuova accettazione esplicita.
 
 ---
 
-*Documento redatto il 2026-10-04, revisione 1.2 del 2026-10-06. I segnaposto `<EMAIL>` e `<CITTÀ>` vanno
-completati prima della diffusione. Prima di utilizzare questo EULA in un
+*Documento redatto il 2026-10-04, revisione 1.3 del 2026-10-23. I segnaposto `<TITOLARI>`, `<EMAIL>` e `<CITTÀ>`
+vanno completati prima della diffusione. Prima di utilizzare questo EULA in un
 contesto commerciale o contrattuale è opportuno farlo valutare da un
 professionista abilitato.*
