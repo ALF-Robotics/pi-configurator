@@ -40,8 +40,9 @@
 
 ## 📋 Indice
 
-- [Installazione rapida](#-installazione-rapida) — scarica `pi-conf.sh` e lancialo
+- [⚡ In una riga sola](#-in-una-riga-sola) — esegui lo script dal web, senza scaricare nulla
 - [Let your AI set it up](#-let-your-ai-set-it-up) — se preferisci che lo faccia un assistente
+- [Scarica ed esegui](#-scarica-ed-esegui) — il percorso manuale, con il file in locale
 - [Cosa fa](#-cosa-fa) — le 9 domande, una per una
 - [Come funziona il merge](#-come-funziona-il-merge)
 - [Uso non interattivo](#-uso-non-interattivo) — per provisioning e script
@@ -52,55 +53,43 @@
 
 ---
 
-## 🚀 Installazione rapida
+## ⚡ In una riga sola
 
-`pi-conf.sh` è lo script che configura pi. Scaricalo e lancialo.
+Il modo più rapido: **nessun file da scaricare, nessun clone**. Lo script
+viene eseguito direttamente dal web, sul posto.
 
-### Scarica
-
-```bash
-# macOS / Linux
-curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.sh
-```
-
-```powershell
-# Windows
-irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.0/pi-conf.ps1
-```
-
-> [!TIP]
-> **Pinna la versione.** `main` può cambiare in qualsiasi momento, un tag no.
-> Sostituisci `v0.4.0` con il tag che ti serve.
-
-### Lancia
+### macOS / Linux
 
 ```bash
-chmod +x pi-conf.sh
-./pi-conf.sh
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.sh)"
 ```
 
+### Windows (PowerShell)
+
 ```powershell
-.\pi-conf.ps1
+irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1 | iex
+```
+
+`irm` è l'alias di `Invoke-WebRequest`, `iex` quello di `Invoke-Expression`.
+Per esteso:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1 | Invoke-Expression
 ```
 
 > [!NOTE]
-> **Serve `jq`** (su macOS: `brew install jq`). Su Windows non serve niente:
-> `pi-conf.ps1` usa solo cmdlets nativi.
+> **In PowerShell il pipe funziona anche in interattivo**, al contrario di bash:
+> lo stdin non viene toccato, quindi le prompt leggono le tue risposte.
+> `-UseBasicParsing` serve a Windows PowerShell 5.1 (su PowerShell 7 è
+> ridondante, ma innocuo).
 
-### In una riga sola
+### Configurazione remota, senza domande
 
-Se non vuoi scaricare il file, puoi eseguire lo script direttamente dal web.
-
-**Interattivo**, con le prompt che funzionano:
-
-```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/pi-conf.sh)"
-```
-
-**Configurazione remota**, senza domande:
+Per il provisioning — un server, un container, un'installazione non presidiata —
+gli stessi script girano in non interattivo.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/pi-conf.sh \
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.sh \
   | bash -s -- add \
       --endpoint https://api.server.example \
       --api anthropic \
@@ -109,8 +98,10 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/main/p
       --yes
 ```
 
-Per pinnare la versione basta sostituire `main` con il tag nell'URL:
-`.../pi-configurator/v0.4.0/pi-conf.sh`.
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1).Content)) add `
+    -Endpoint https://api.server.example -Api anthropic -Model MLR-3 -KeyEnv MLR_API_KEY -Yes
+```
 
 > [!WARNING]
 > **`curl … | bash` in interattivo non funziona.** Con il pipe lo stdin contiene
@@ -120,6 +111,11 @@ Per pinnare la versione basta sostituire `main` con il tag nell'URL:
 > Per questo la forma interattiva usa `bash -c "…"`: lo script arriva come
 > stringa di comando e lo stdin resta il terminale. Nella forma non interattiva
 > il pipe è invece la scelta giusta, perché `add` non legge mai stdin.
+
+> [!TIP]
+> **Pinna la versione.** Gli esempi qui usano il tag `v0.4.1`. Sostituiscilo
+> con `main` solo se segui deliberatamente la versione di sviluppo: `main` può
+> cambiare in qualsiasi momento.
 
 ### Cosa succede
 
@@ -157,6 +153,45 @@ powershell -ExecutionPolicy Bypass -File .\pi-conf.ps1
 
 </details>
 
+
+---
+
+## 📥 Scarica ed esegui
+
+Se preferisci avere il file in locale — per ripeterlo, per ispezionarlo o per
+metterlo nel `PATH`:
+
+### Scarica
+
+```bash
+# macOS / Linux
+curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.sh
+```
+
+```powershell
+# Windows
+irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1
+```
+
+> [!TIP]
+> **Pinna la versione.** `main` può cambiare in qualsiasi momento, un tag no.
+> Sostituisci `v0.4.1` con il tag che ti serve.
+
+### Lancia
+
+```bash
+chmod +x pi-conf.sh
+./pi-conf.sh
+```
+
+```powershell
+.\pi-conf.ps1
+```
+
+> [!NOTE]
+> **Serve `jq`** (su macOS: `brew install jq`). Su Windows non serve niente:
+> `pi-conf.ps1` usa solo cmdlets nativi.
+
 <details>
 <summary><b>Altre modalità (opzionale)</b></summary>
 
@@ -183,6 +218,7 @@ cd pi-configurator
 
 </details>
 
+
 ---
 
 ## 🤖 Let your AI set it up
@@ -202,17 +238,17 @@ flag e le procedure sono definiti li', non improvvisarli.
 
 Procedura, senza deviazioni:
 
-1. Scarica install-provider.sh dal TAG v0.4.0, mai da main, in una directory
+1. Scarica install-provider.sh dal TAG v0.4.1, mai da main, in una directory
    temporanea. Pinna il tag: main puo' cambiare in qualsiasi momento.
 2. Verifica lo SHA256 del file scaricato confrontandolo con la voce in
-   SHA256SUMS scaricata dallo STESSO ref (v0.4.0), non da main. Se non
+   SHA256SUMS scaricata dallo STESSO ref (v0.4.1), non da main. Se non
    corrisponde, FERMATI e segnalalo. Non usare --no-verify e non eseguire
    un file non verificato.
 3. Chiedimi solo cio' che non puoi dedurre: endpoint, model id, e il nome della
    variabile d'ambiente che contiene la API key. Non chiedermi la chiave in
    chiaro.
 4. Esegui l'installer con:
-       --ref v0.4.0
+       --ref v0.4.1
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -247,17 +283,17 @@ procedures are defined there, do not improvise them.
 
 Procedure, with no deviations:
 
-1. Download install-provider.sh from the TAG v0.4.0, never from main, into a
+1. Download install-provider.sh from the TAG v0.4.1, never from main, into a
    temporary directory. Pin the tag: main can change at any moment.
 2. Verify the SHA256 of the downloaded file against the entry in SHA256SUMS
-   fetched from the SAME ref (v0.4.0), not from main. If it does not match,
+   fetched from the SAME ref (v0.4.1), not from main. If it does not match,
    STOP and report it. Do not use --no-verify, and never run a file you have
    not verified.
 3. Ask me only for what you cannot infer: endpoint, model id, and the name of
    the environment variable holding the API key. Do not ask me for the key in
    clear.
 4. Run the installer with:
-       --ref v0.4.0
+       --ref v0.4.1
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -526,35 +562,45 @@ Entrambi richiedono ovviamente `pi` installato e un `~/.pi/agent/` scrivibile.
 bash tests/pi-conf-test.sh
 ```
 
-**136 asserzioni in 15 sezioni.** Coprono merge non distruttivo, backup,
-mascheramento in anteprima, permessi del file, modalità non interattiva,
-`sanitize_name`, i due installer e una guardia che verifica che la suite non
-abbia mai toccato il `models.json` reale.
+**136 asserzioni in 15 sezioni** su `pi-conf.sh`, `install.sh` e
+`install-provider.sh`: merge non distruttivo, backup, mascheratura dell'anteprima,
+permessi del file, modalità non interattiva, `sanitize_name`, i due installer e
+una guardia che verifica che la suite non abbia mai toccato il
+`models.json` reale.
 
-`pi-conf.sh`, `install.sh` e `install-provider.sh` sono coperti **eseguendoli**;
-i tre file PowerShell sono presi in carico solo da controlli statici, perché
-`pwsh` non è necessario per eseguire la suite.
+**`pi-conf.ps1` viene eseguito davvero** dalla §16, se `pwsh` è installato:
+sono altre **44 asserzioni** sulle tre forme degli argomenti, sugli errori e sul
+merge. Su una macchina senza PowerShell restano i controlli statici.
 
-La suite è stata verificata **per sabotaggio**: disattivando la verifica SHA256
-dell'installer, il ritaglio del trattino in `sanitize_name`, la scrittura di
-`--key-env` come riferimento env, il controllo anticipato su `--model`, la
-guardia `has("apiKey")`, la conservazione di `input` nel merge, il default di
-`input` applicato a forza, la validazione di `--input` o la conservazione di
-`input` in PowerShell, la suite **fallisce** in tutti e nove i casi.
+La suite è stata verificata **per sabotaggio**: disabilitando la verifica
+SHA256 dell'installer, il trim dei trattini in `sanitize_name`, la scrittura di
+`--key-env` come riferimento all'ambiente, il controllo anticipato su `--model`,
+la guardia `has("apiKey")`, la preservazione di `input` nel merge, il default
+di `input` forzato incondizionatamente, la validazione di `--input`, la
+preservazione di `input` in PowerShell, il chiamato `Get-AddOptions -Args` in
+`pi-conf.ps1`, l'`input` forzato a `["text"]` in `pi-conf.ps1` e il
+`ConvertFrom-Json` su un ordered dictionary in `pi-conf.ps1`, la suite
+**fallisce** in tutti e dodici i casi.
 
-Un sabotaggio ha rivelato un test che passava senza motivo: il percorso
-interattivo scrive **sempre** un `input` esplicito, quindi non arrivava mai a
-coprire la conservazione nel merge. Il test che la copre ora passa per `add`
-senza `--input`, ed è quello che intercetta il sabotaggio.
+Un sabotaggio ha rivelato un test che passava per il motivo sbagliato: il
+percorso interattivo scrive sempre un `input` **esplicito**, quindi non
+arrivava mai al merge. Il test che ora lo copre passa da `add` senza
+`--input`, ed è quello che lo sabotaggio fa scattare.
 
 ---
 
 ## 🚧 Limiti noti
 
-- **Nessuno dei file PowerShell è mai stato eseguito.** `pi-conf.ps1`,
-  `install.ps1` e `install-provider.ps1` hanno copertura solo statica (grafi
-  bilanciati, presenza dei marker, coerenza dei default fra le due
-  implementazioni). La logica va verificata su Windows.
+- **`pi-conf.ps1` è eseguito solo dove c'è `pwsh`.** La suite PowerShell (44
+  asserzioni) gira dalla §16 quando `pwsh` è installato; altrove restano i
+  controlli statici. `install.ps1` e `install-provider.ps1` hanno ancora
+  copertura **solo statica** (grafi bilanciati, presenza dei marker, coerenza
+  dei default fra le due implementazioni): la loro logica va verificata su
+  Windows.
+- **La versione Windows non è stata provata su Windows.** `pi-conf.ps1` è
+  stato eseguito con PowerShell 7 su macOS; il comportamento di Windows
+  PowerShell 5.1 (in particolare `RawUI.ReadKey` per la lettura della API key)
+  non è stato verificato su una sessione Windows reale.
 - **Gli installer non sono mai stati provati in un test automatico contro
   GitHub.** I test li esercitano da checkout locale, che è un percorso diverso
   dal download via rete. La riga `curl … | sh` è stata eseguita a mano e ha
@@ -576,7 +622,7 @@ senza `--input`, ed è quello che intercetta il sabotaggio.
 
 <div align="center">
 
-**MIT** · [EULA v1.3](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.4.0`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
+**MIT** · [EULA v1.3](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.4.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <b>Italiano</b> · 🇬🇧 <a href="README.en.md">English</a></sub>
 

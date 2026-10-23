@@ -732,6 +732,26 @@ grep -qE "\['input'\] *= *\\\$Old\.input" <<<"$ps" \
 
 echo
 
+# --- §16 pi-conf.ps1 eseguito davvero (solo se pwsh e' disponibile) ----------
+# Fino alla v0.4.0 pi-conf.ps1 non era mai stato eseguito: i controlli
+# statici di §9 non lo avrebbero fermato. La suite PowerShell ne esegue il
+# percorso non interattivo (le tre forme degli argomenti, gli errori, il
+# merge). Se pwsh non e' installato la sezione viene saltata.
+PS_TEST="$REPO_DIR/tests/pi-conf-ps1-test.ps1"
+if command -v pwsh >/dev/null 2>&1; then
+    echo "§16 pi-conf.ps1 eseguito con pwsh"
+    ps_out="$(pwsh -NoProfile -File "$PS_TEST" 2>&1)"
+    ps_rc=$?
+    while IFS= read -r line; do printf '  %s\n' "$line"; done <<<"$ps_out"
+    if [[ "$ps_rc" -eq 0 ]]; then
+        ok "pi-conf.ps1: suite PowerShell verde"
+    else
+        fail "pi-conf.ps1: suite PowerShell" "tutti i test verdi" "ci sono test falliti (rc=$ps_rc)"
+    fi
+else
+    echo "§16 pi-conf.ps1 non eseguito (pwsh non presente)"
+fi
+
 # --- guardia finale: la configurazione reale non deve essere cambiata -------
 echo "§13 guardia configurazione reale"
 REAL_CONF_AFTER="$(conf_sig)"

@@ -12,8 +12,11 @@
 param(
     [switch]$Help,
     # Tutto il resto della riga di comando, per la modalita' non interattiva.
+    # [object[]] e non [string[]]: in PowerShell una virgola non quotata crea
+    # un array ('--input text,image'), e la conversione a stringa lo
+    # distruggerebbe ('text image').
     [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$Rest
+    [object[]]$Rest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -182,7 +185,9 @@ function Merge-Model {
     if (-not $New.Keys.Contains('input') -and -not ($Old.PSObject.Properties.Name -contains 'input')) {
         $res['input'] = @('text','image')
     }
-    return ($res | ConvertFrom-Json)
+    # ConvertTo-Json prima: $res e' un OrderedDictionary, e ConvertFrom-Json
+    # su un dizionario (non su una stringa JSON) fallisce.
+    return ($res | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
 }
 
 function Merge-Provider {
@@ -213,7 +218,7 @@ function Merge-Provider {
             $outModels += ,$m
         }
     }
-    if (-not $found) { $outModels += ,($newModel | ConvertFrom-Json) }
+    if (-not $found) { $outModels += ,($newModel | ConvertTo-Json -Depth 10 | ConvertFrom-Json) }
 
     # Un modello nuovo senza `input` dichiarato deve comunque avere il default
     # testo puro: qui non passa da Merge-Model.
@@ -294,39 +299,37 @@ Esempio:
 function Get-AddOptions {
     # Parsing della riga di comando non interattiva.
     # Restituisce un hashtable, oppure `$null` se non serve la modalita' add.
-    # Accetta sia le forme lunghe GNU (`--endpoint URL`) sia quelle corte
-    # PowerShell (`-Endpoint URL`).
-    $triggers = @('add','--endpoint','-endpoint','--api','-api','--model','-model',
-                  '--profile','-profile','--key','-key','--key-env','-keyenv',
-                  '--reasoning','--no-reasoning','-noreasoning',
-                  '--context','-context','--max-tokens','-maxtokens',
-                  '--input','-input',
-                  '--from-file','-fromfile','--config','-config',
-                  '--dry-run','--print-config','-printconfig','--yes','-y')
-    $long = @('--endpoint','--api','--model','--profile','--key','--key-env',
-              '--context','--max-tokens','--input','--from-file','--config')
+    # Accetta tre forme per ogni opzione:
+    #   --endpoint URL   (GNU, doppio trattino)
+    #   -Endpoint URL    (PowerShell, trattino singolo)
+    #   --endpoint=URL   (uguale)
+    # Il nome dell'opzione e' case-insensitive, come in PowerShell.
+    #
+    # `$Args` non puo' essere il nome di un parametro: e' la variabile
+    # automatica di PowerShell e non e' bindabile. Per questo la lista
+    # arriva in $ArgList.
+    param([object[]]$ArgList)
 
-    $isAdd = $false
-    foreach ($a in $Args) {
-        if ($triggers -contains $a) { $isAdd = $true; break }
-        $name = ($a -split '=', 2)[0]
-        if ($triggers -contains $name) { $isAdd = $true; break }
+    # Flag che accettano un valore: nome normalizzato -> chiave del hashtable.
+    $valueFlags = @{
+        'endpoint'   = 'endpoint'
+        'api'        = 'api'
+        'model'      = 'model'
+        'profile'    = 'profile'
+        'key'        = 'key'
+        'key-env'    = 'keyEnv'
+        'keyenv'     = 'keyEnv'
+        'context'    = 'context'
+        'max-tokens' = 'maxTokens'
+        'maxtokens'  = 'maxTokens'
+        'input'      = 'input'
+        'from-file'  = 'fromFile'
+        'fromfile'   = 'fromFile'
+        'config'     = 'config'
     }
-    if (-not $isAdd) { return $null }
-
-    # normalizza "-Endpoint URL" / "--endpoint URL" in "-Endpoint=URL"
-    $norm = @()
-    $i = 0
-    while ($i -lt $Args.Count) {
-        $a = $Args[$i]
-        $isFlag = $false
-        foreach ($t in $triggers) { if ($a -eq $t) { $isFlag = $true } }
-        if ($isFlag) { $norm += $a; $i++; continue }
-        if ($a -match '^--?[A-Za-z-]+$' -and ($i + 1) -lt $Args.Count) {
-            $norm += "$a=$($Args[$i + 1])"; $i += 2; continue
-        }
-        $norm += $a; $i++
-    }
+    # Flag booleani: attivano la modalita' add, senza valore.
+    $boolFlags = @('add','reasoning','no-reasoning','noreasoning','dry-run','dryrun',
+                   'print-config','printconfig','yes','y')
 
     $o = @{
         endpoint = $null; api = 'anthropic'; model = $null; profile = $null
@@ -336,34 +339,76 @@ function Get-AddOptions {
         dryRun = $false; printConfig = $false
     }
 
-    foreach ($a in $norm) {
-        $k = $a; $v = $null
-        if ($a -match '^(.+?)=(.*)$') { $k = $Matches[1]; $v = $Matches[2] }
-        switch ($k.ToLower()) {
-            'add'            { }
-            '--reasoning'    { $o.reasoning = 'y' }
-            '--no-reasoning' { $o.reasoning = 'n' }
-            '--dry-run'      { $o.dryRun = $true }
-            '--print-config' { $o.printConfig = $true }
-            '--yes'          { }
-            '--endpoint'     { $o.endpoint   = $v }
-            '--api'          { $o.api        = $v }
-            '--model'        { $o.model      = $v }
-            '--profile'      { $o.profile    = $v }
-            '--key'          { $o.key        = $v }
-            '--key-env'      { $o.keyEnv     = $v }
-            '--context'      { $o.context    = $v }
-            '--max-tokens'   { $o.maxTokens  = $v }
-            '--input'        { $o.input      = $v }
-            '--from-file'    { $o.fromFile   = $v }
-            '--config'       { $o.config     = $v }
-            default {
-                Write-Host "Errore: argomento sconosciuto: $k" -ForegroundColor Red
+    $isAdd = $false
+    $i = 0
+    while ($i -lt $ArgList.Count) {
+        $tok = $ArgList[$i]
+        if ($null -eq $tok) { $i++; continue }
+        if ($tok -isnot [string]) {
+            Write-Host "Errore: argomento sconosciuto: $tok" -ForegroundColor Red
+            Show-AddUsage | Out-Null
+            $script:AddParseError = $true
+            return $null
+        }
+        if ([string]::IsNullOrWhiteSpace($tok)) { $i++; continue }
+
+        if ($tok -notmatch '^-') {
+            if ($tok.ToLower() -eq 'add') { $isAdd = $true; $i++; continue }
+            Write-Host "Errore: argomento sconosciuto: $tok" -ForegroundColor Red
+            Show-AddUsage | Out-Null
+            $script:AddParseError = $true
+            return $null
+        }
+
+        $name = $tok
+        $val  = $null
+        $eq = $tok.IndexOf('=')
+        if ($eq -ge 0) {
+            $name = $tok.Substring(0, $eq)
+            $val  = $tok.Substring($eq + 1)
+        }
+        $name = ($name -replace '^-+', '').ToLower()
+
+        if ($boolFlags -contains $name) {
+            $isAdd = $true
+            switch ($name) {
+                'no-reasoning' { $o.reasoning = 'n' }
+                'noreasoning'  { $o.reasoning = 'n' }
+                'dry-run'      { $o.dryRun = $true }
+                'dryrun'       { $o.dryRun = $true }
+                'print-config' { $o.printConfig = $true }
+                'printconfig'  { $o.printConfig = $true }
+            }
+            $i++
+            continue
+        }
+
+        $key = $null
+        foreach ($k in $valueFlags.Keys) {
+            if ($k -eq $name) { $key = $valueFlags[$k]; break }
+        }
+        if (-not $key) {
+            Write-Host "Errore: argomento sconosciuto: $tok" -ForegroundColor Red
+            Show-AddUsage | Out-Null
+            $script:AddParseError = $true
+            return $null
+        }
+        if ($null -eq $val) {
+            if (($i + 1) -ge $ArgList.Count) {
+                Write-Host "Errore: all'opzione $tok manca il valore" -ForegroundColor Red
                 Show-AddUsage | Out-Null
+                $script:AddParseError = $true
                 return $null
             }
+            $val = $ArgList[$i + 1]
+            $i++
         }
+        $o[$key] = $val
+        $isAdd = $true
+        $i++
     }
+
+    if (-not $isAdd) { return $null }
     return $o
 }
 
@@ -373,12 +418,12 @@ function Invoke-Add {
     if ($O.fromFile) {
         if (-not (Test-Path $O.fromFile)) {
             Write-Host "Errore: --from-file '$($O.fromFile)' non esiste" -ForegroundColor Red
-            return 1
+            $script:AddExitCode = 1; return
         }
         try { $f = Get-Content $O.fromFile -Raw | ConvertFrom-Json }
         catch {
             Write-Host "Errore: --from-file '$($O.fromFile)' non e' JSON valido" -ForegroundColor Red
-            return 1
+            $script:AddExitCode = 1; return
         }
         if (-not $O.endpoint)   { $O.endpoint   = $f.endpoint }
         if ($O.api -eq 'anthropic' -and $f.PSObject.Properties.Name -contains 'api') { $O.api = $f.api }
@@ -398,19 +443,19 @@ function Invoke-Add {
 
     if (-not $O.endpoint) {
         Write-Host "Errore: manca --endpoint (obbligatorio)" -ForegroundColor Red
-        return 1
+        $script:AddExitCode = 1; return
     }
     if ($O.endpoint -notmatch '^https?://') {
         Write-Host "Errore: endpoint non valido: deve iniziare con http:// o https://" -ForegroundColor Red
-        return 1
+        $script:AddExitCode = 1; return
     }
     if (-not $O.model) {
         Write-Host "Errore: manca --model (obbligatorio)" -ForegroundColor Red
-        return 1
+        $script:AddExitCode = 1; return
     }
     if ($O.key -and $O.keyEnv) {
         Write-Host "Errore: --key e --key-env sono incompatibili: scegline uno" -ForegroundColor Red
-        return 1
+        $script:AddExitCode = 1; return
     }
 
     $profile = $O.profile
@@ -420,29 +465,32 @@ function Invoke-Add {
     }
     if ($profile -notmatch '^[a-zA-Z0-9_-]+$') {
         Write-Host "Errore: nome profilo '$profile' non valido (usa solo [a-zA-Z0-9_-])" -ForegroundColor Red
-        return 1
+        $script:AddExitCode = 1; return
     }
 
     $ctx = if ($O.context)   { $O.context }   else { '512000' }
     $max = if ($O.maxTokens) { $O.maxTokens } else { '32768' }
     if ("$ctx" -notmatch '^\d+$') {
         Write-Host "Errore: --context deve essere un intero" -ForegroundColor Red
-        return 1
+        $script:AddExitCode = 1; return
     }
     if ("$max" -notmatch '^\d+$') {
         Write-Host "Errore: --max-tokens deve essere un intero" -ForegroundColor Red
-        return 1
+        $script:AddExitCode = 1; return
     }
 
     # input: validato contro l'unione di pi ("text" | "image"). Se assente
     # resta $null e il merge conserva l'input gia' presente nel modello.
     $inputList = $null
     if ($null -ne $O.input) {
+        # In PowerShell una virgola non quotata crea un array: '--input text,image'
+        # arriva come @('text','image'). Si ricompone in una stringa.
+        if ($O.input -is [array]) { $O.input = ($O.input -join ',') }
         $inputList = @()
         foreach ($tok in ("$($O.input)" -replace '\s', '' -split ',')) {
             if ($tok -ne 'text' -and $tok -ne 'image') {
                 Write-Host "Errore: --input accetta solo text e image, separati da virgola (es. --input text,image): '$($O.input)'" -ForegroundColor Red
-                return 1
+                $script:AddExitCode = 1; return
             }
             $inputList += $tok
         }
@@ -454,7 +502,7 @@ function Invoke-Add {
     if ($O.keyEnv) {
         if ($O.keyEnv -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
             Write-Host "Errore: --key-env '$($O.keyEnv)' non e' un nome di variabile valido" -ForegroundColor Red
-            return 1
+            $script:AddExitCode = 1; return
         }
         $apiKey = '$' + $O.keyEnv
     } elseif ($O.key) {
@@ -468,61 +516,70 @@ function Invoke-Add {
         api     = (Map-Standard $O.api)
     }
     if ($apiKey -ne '') { $provider['apiKey'] = $apiKey }
-    $provider['models'] = @([ordered]@{
+    $newModel = [ordered]@{
         id            = $O.model
         name          = $O.model
         reasoning     = $reasoningBool
-        input         = @('text')
         contextWindow = [int]$ctx
         maxTokens     = [int]$max
         cost          = [ordered]@{ input = 0; output = 0; cacheRead = 0; cacheWrite = 0 }
-    })
+    }
+    # `input` viene dichiarato solo se richiesto esplicitamente con --input.
+    # Se manca, il merge conserva quello gia' presente nel modello esistente
+    # e, per un modello nuovo, applica il default ["text","image"]: stessa
+    # regola di pi-conf.sh.
+    if ($null -ne $inputList -and $inputList.Count -gt 0) { $newModel['input'] = $inputList }
+    $provider['models'] = @($newModel)
     $pjson = $provider | ConvertTo-Json -Depth 10
 
-    if ($O.dryRun) {
-        Write-Host "ANTEPRIMA (dry-run, nulla scritto in $PiConfFile)"
-        (Mask-ApiKey -Provider ($pjson | ConvertFrom-Json)) | ConvertTo-Json -Depth 10
-        return 0
-    }
-
-    if ($O.printConfig) {
-        $base = [PSCustomObject]@{ providers = [PSCustomObject]@{} }
-        if (Test-Path $PiConfFile) { $base = Get-Content $PiConfFile -Raw -Encoding UTF8 | ConvertFrom-Json }
-        $oldProvider = $null
-        if (($base.PSObject.Properties.Name -contains 'providers') -and $base.providers -and
-            ($base.providers.PSObject.Properties.Name -contains $profile)) {
-            $oldProvider = $base.providers.$profile
-        }
-        $merged = Merge-Provider -Old $oldProvider -New $provider
-        $providers = [ordered]@{}
-        if ($base.providers) {
-            foreach ($pr in $base.providers.PSObject.Properties) { $providers[$pr.Name] = $pr.Value }
-        }
-        $providers[$profile] = ($merged | ConvertFrom-Json)
-        [PSCustomObject]@{ providers = $providers } | ConvertTo-Json -Depth 10
-        return 0
-    }
-
-    # Carica esistente: se il file non e' parsabile si abortisce senza scrivere,
-    # stesso comportamento di pi-conf.sh.
-    $existingObj = [PSCustomObject]@{ providers = [PSCustomObject]@{} }
+    # Carica la configurazione esistente: dry-run e print-config devono
+    # mostrare il risultato del MERGE (non il provider grezzo), cosi' come
+    # fa pi-conf.sh. Serve anche a non perdere i campi non gestiti.
+    $base = [PSCustomObject]@{ providers = [PSCustomObject]@{} }
     if (Test-Path $PiConfFile) {
         try {
             $raw = Get-Content $PiConfFile -Raw -Encoding UTF8
             if (-not [string]::IsNullOrWhiteSpace($raw)) {
                 $parsed = $raw | ConvertFrom-Json
                 if (($parsed.PSObject.Properties.Name -contains 'providers') -and $parsed.providers) {
-                    $existingObj = $parsed
+                    $base = $parsed
                 }
             }
         } catch {
             Write-Host "Errore: $PiConfFile non parsabile - $($_.Exception.Message)" -ForegroundColor Red
             Write-Host "Nessuna scrittura effettuata. Correggi o sposta il file, poi rilancia." -ForegroundColor Red
-            return 1
+            $script:AddExitCode = 1; return
         }
     }
+    $oldProvider = $null
+    if (($base.PSObject.Properties.Name -contains 'providers') -and $base.providers -and
+        ($base.providers.PSObject.Properties.Name -contains $profile)) {
+        $oldProvider = $base.providers.$profile
+    }
+    $merged = Merge-Provider -Old $oldProvider -New $provider
 
-    if (-not (Save-ConfigBackup -Path $PiConfFile)) { return 1 }
+    if ($O.dryRun) {
+        Write-Host "ANTEPRIMA (dry-run, nulla scritto in $PiConfFile)"
+        (Mask-ApiKey -Provider ($merged | ConvertTo-Json -Depth 10 | ConvertFrom-Json)) | ConvertTo-Json -Depth 10
+        $script:AddExitCode = 0; return
+    }
+
+    if ($O.printConfig) {
+        $providers = [ordered]@{}
+        if ($base.providers) {
+            foreach ($pr in $base.providers.PSObject.Properties) { $providers[$pr.Name] = $pr.Value }
+        }
+        $providers[$profile] = ($merged | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
+        [PSCustomObject]@{ providers = $providers } | ConvertTo-Json -Depth 10
+        $script:AddExitCode = 0; return
+    }
+
+    # La configurazione esistente e' gia' stata caricata in $base: non
+    # ripartire da vuoto, sovrascrivere un file non parsabile cancellerebbe
+    # tutto il suo contenuto. Stesso comportamento di bash.
+    $existingObj = $base
+
+    if (-not (Save-ConfigBackup -Path $PiConfFile)) { $script:AddExitCode = 1; return }
 
     if (-not ($existingObj.PSObject.Properties.Name -contains 'providers')) {
         $existingObj | Add-Member -NotePropertyName 'providers' -NotePropertyValue ([PSCustomObject]@{}) -Force
@@ -536,9 +593,9 @@ function Invoke-Add {
     $merged = Merge-Provider -Old $oldProvider -New $provider
 
     if ($existingObj.providers.PSObject.Properties.Name -contains $profile) {
-        $existingObj.providers.$profile = ($merged | ConvertFrom-Json)
+        $existingObj.providers.$profile = ($merged | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
     } else {
-        $existingObj.providers | Add-Member -NotePropertyName $profile -NotePropertyValue ($merged | ConvertFrom-Json) -Force
+        $existingObj.providers | Add-Member -NotePropertyName $profile -NotePropertyValue ($merged | ConvertTo-Json -Depth 10 | ConvertFrom-Json) -Force
     }
 
     $existingObj | ConvertTo-Json -Depth 10 | Set-Content -Path $PiConfFile -Encoding UTF8
@@ -548,10 +605,16 @@ function Invoke-Add {
     if ($O.keyEnv) {
         Write-Host "     apiKey: letta dall'env var $($O.keyEnv) (non scritta in chiaro)"
     }
-    return 0
+    $script:AddExitCode = 0; return
 }
 
 # --- Main -------------------------------------------------------------------
+
+# Codice di uscita del percorso non interattivo. Va in una variabile e non
+# nel valore restituito da Invoke-Add: con `exit (Invoke-Add ...)` tutto
+# l'output della funzione (per esempio il JSON del dry-run) verrebbe
+# catturato come codice di uscita e non stampato.
+$script:AddExitCode = 0
 
 if ($Help) {
     Show-Usage
@@ -562,10 +625,16 @@ Write-Host "pi-conf.ps1 — creazione profilo provider per pi-code"
 Write-Host "=================================================="
 
 # Percorso non interattivo: richiesto esplicitamente o implicito da un flag.
-$addOpts = Get-AddOptions -Args $Rest
+$script:AddParseError = $false
+$addOpts = $null
+if ($Rest -and $Rest.Count -gt 0) {
+    $addOpts = Get-AddOptions -ArgList $Rest
+}
+if ($script:AddParseError) { exit 1 }
 if ($addOpts) {
     if ($addOpts.config) { $PiConfFile = $addOpts.config }
-    exit (Invoke-Add -O $addOpts)
+    Invoke-Add -O $addOpts
+    exit $script:AddExitCode
 }
 
 Write-Host "Config: $PiConfFile"
@@ -775,9 +844,9 @@ if ($existingObj.providers.PSObject.Properties.Name -contains $ProfileName) {
 $mergedProvider = Merge-Provider -Old $oldProvider -New $provider
 
 if ($existingObj.providers.PSObject.Properties.Name -contains $ProfileName) {
-    $existingObj.providers.$ProfileName = ($mergedProvider | ConvertFrom-Json)
+    $existingObj.providers.$ProfileName = ($mergedProvider | ConvertTo-Json -Depth 10 | ConvertFrom-Json)
 } else {
-    $existingObj.providers | Add-Member -NotePropertyName $ProfileName -NotePropertyValue ($mergedProvider | ConvertFrom-Json) -Force
+    $existingObj.providers | Add-Member -NotePropertyName $ProfileName -NotePropertyValue ($mergedProvider | ConvertTo-Json -Depth 10 | ConvertFrom-Json) -Force
 }
 
 # Salva
