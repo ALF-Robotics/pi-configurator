@@ -39,6 +39,11 @@ export PATH="$STUB_DIR:$PATH"
 # test l'ha toccata. Senza questa guardia un test che dimentica PI_CONF_FILE
 # scrive sul models.json dell'utente e fallisce in silenzio: e' successo.
 REAL_CONF="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/models.json"
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
+    else shasum -a 256 "$1" | cut -d' ' -f1; fi
+}
+
 conf_sig() {
     if [ -f "$REAL_CONF" ]; then
         if command -v sha256sum >/dev/null 2>&1; then sha256sum "$REAL_CONF" | cut -d' ' -f1
@@ -717,6 +722,62 @@ if [ -e "$F" ]; then
     fail "--dry-run con --input non scrive nulla" "config assente" "config scritta"
 else
     ok "--dry-run con --input non scrive nulla"
+fi
+
+# L'anteprima del dry-run deve mostrare il RISULTATO DEL MERGE, non il provider
+# grezzo: e' quello che verra' scritto. In particolare l'input, che senza
+# --input viene preservato dal modello esistente.
+F="$WORK/s15-dry-merge.json"
+seed_mm "$F"
+before="$(sha256_of "$F")"
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --model MLR-3 --profile MLR-3 \
+    --dry-run --yes > "$WORK/out" 2>&1
+if grep -q '"image"' "$WORK/out"; then
+    ok "l'anteprima del dry-run mostra l'input che verrà scritto"
+else
+    fail "l'anteprima del dry-run mostra l'input che verrà scritto" \
+         "image presente" "$(head -20 "$WORK/out")"
+fi
+if grep -q 'testkey_KEEPME' "$WORK/out"; then
+    fail "l'anteprima del dry-run non mostra la api key in chiaro" \
+         "chiave assente" "chiave in chiaro presente"
+else
+    ok "l'anteprima del dry-run non mostra la api key in chiaro"
+fi
+if [ "$(sha256_of "$F")" == "$before" ]; then
+    ok "--dry-run senza --input non scrive nulla"
+else
+    fail "--dry-run senza --input non scrive nulla" "config invariata" "config modificata"
+fi
+
+# Su un modello solo-testo gia' esistente, il dry-run senza --input deve
+# mostrare ["text"]: il merge non promuove a multimodale.
+F="$WORK/s15-preview-text.json"
+cat > "$F" <<'JSON'
+{
+  "providers": {
+    "MLR-3": {
+      "baseUrl": "https://api.server.example",
+      "api": "anthropic-messages",
+      "models": [
+        { "id": "MLR-3", "name": "MLR-3", "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 512000, "maxTokens": 32768,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 } }
+      ]
+    }
+  }
+}
+JSON
+PI_CONF_FILE="$F" bash "$CONF_SH" add \
+    --endpoint https://api.server.example --model MLR-3 --profile MLR-3 \
+    --dry-run --yes > "$WORK/out" 2>&1
+if grep -q '"text"' "$WORK/out" && ! grep -q '"image"' "$WORK/out"; then
+    ok "il dry-run su un modello solo-testo non promuove a multimodale"
+else
+    fail "il dry-run su un modello solo-testo non promuove a multimodale" \
+         "solo text" "$(head -20 "$WORK/out")"
 fi
 
 # --- §15b parita' statica su pi-conf.ps1 (non eseguito) ---------------------

@@ -467,7 +467,22 @@ run_add() {
 
     if [[ "$OPT_DRY_RUN" == true ]]; then
         echo "ANTEPRIMA (dry-run, nulla scritto in $PI_CONF_FILE)"
-        echo "$pjson" | mask_api_key | jq .
+        # L'anteprima mostra il RISULTATO DEL MERGE, non il provider grezzo:
+        # e' cio' che verra' scritto davvero (input preservato sul modello
+        # esistente, campi non gestiti mantenuti). Se il merge non e'
+        # applicabile - file di configurazione non parsabile - si mostra il
+        # provider grezzo, senza toccare nulla.
+        local base='{"providers":{}}'
+        [[ -f "$PI_CONF_FILE" ]] && base="$(cat "$PI_CONF_FILE")"
+        local merged
+        merged="$(printf '%s' "$base" \
+            | jq --arg name "$profile" --argjson p "$pjson" "$MERGE_PROGRAM" 2>/dev/null \
+            | jq --arg name "$profile" '.providers[$name]' 2>/dev/null)"
+        if [[ -n "$merged" && "$merged" != "null" ]]; then
+            printf '%s' "$merged" | mask_api_key | jq .
+        else
+            echo "$pjson" | mask_api_key | jq .
+        fi
         return 0
     fi
 

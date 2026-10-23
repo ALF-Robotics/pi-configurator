@@ -61,20 +61,20 @@ viene eseguito direttamente dal web, sul posto.
 ### macOS / Linux
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.sh)"
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1 | iex
+irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1 | iex
 ```
 
 `irm` è l'alias di `Invoke-WebRequest`, `iex` quello di `Invoke-Expression`.
 Per esteso:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1 | Invoke-Expression
+Invoke-WebRequest -UseBasicParsing https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1 | Invoke-Expression
 ```
 
 > [!NOTE]
@@ -89,7 +89,7 @@ Per il provisioning — un server, un container, un'installazione non presidiata
 gli stessi script girano in non interattivo.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.sh \
+curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.sh \
   | bash -s -- add \
       --endpoint https://api.server.example \
       --api anthropic \
@@ -99,7 +99,7 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1
 ```
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1).Content)) add `
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1).Content)) add `
     -Endpoint https://api.server.example -Api anthropic -Model MLR-3 -KeyEnv MLR_API_KEY -Yes
 ```
 
@@ -113,7 +113,7 @@ curl -fsSL https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1
 > il pipe è invece la scelta giusta, perché `add` non legge mai stdin.
 
 > [!TIP]
-> **Pinna la versione.** Gli esempi qui usano il tag `v0.4.1`. Sostituiscilo
+> **Pinna la versione.** Gli esempi qui usano il tag `v0.4.2`. Sostituiscilo
 > con `main` solo se segui deliberatamente la versione di sviluppo: `main` può
 > cambiare in qualsiasi momento.
 
@@ -165,17 +165,17 @@ metterlo nel `PATH`:
 
 ```bash
 # macOS / Linux
-curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.sh
+curl -fsSL -o pi-conf.sh https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.sh
 ```
 
 ```powershell
 # Windows
-irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.1/pi-conf.ps1
+irm -OutFile pi-conf.ps1 https://raw.githubusercontent.com/ALF-Robotics/pi-configurator/v0.4.2/pi-conf.ps1
 ```
 
 > [!TIP]
 > **Pinna la versione.** `main` può cambiare in qualsiasi momento, un tag no.
-> Sostituisci `v0.4.1` con il tag che ti serve.
+> Sostituisci `v0.4.2` con il tag che ti serve.
 
 ### Lancia
 
@@ -238,17 +238,17 @@ flag e le procedure sono definiti li', non improvvisarli.
 
 Procedura, senza deviazioni:
 
-1. Scarica install-provider.sh dal TAG v0.4.1, mai da main, in una directory
+1. Scarica install-provider.sh dal TAG v0.4.2, mai da main, in una directory
    temporanea. Pinna il tag: main puo' cambiare in qualsiasi momento.
 2. Verifica lo SHA256 del file scaricato confrontandolo con la voce in
-   SHA256SUMS scaricata dallo STESSO ref (v0.4.1), non da main. Se non
+   SHA256SUMS scaricata dallo STESSO ref (v0.4.2), non da main. Se non
    corrisponde, FERMATI e segnalalo. Non usare --no-verify e non eseguire
    un file non verificato.
 3. Chiedimi solo cio' che non puoi dedurre: endpoint, model id, e il nome della
    variabile d'ambiente che contiene la API key. Non chiedermi la chiave in
    chiaro.
 4. Esegui l'installer con:
-       --ref v0.4.1
+       --ref v0.4.2
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -283,17 +283,17 @@ procedures are defined there, do not improvise them.
 
 Procedure, with no deviations:
 
-1. Download install-provider.sh from the TAG v0.4.1, never from main, into a
+1. Download install-provider.sh from the TAG v0.4.2, never from main, into a
    temporary directory. Pin the tag: main can change at any moment.
 2. Verify the SHA256 of the downloaded file against the entry in SHA256SUMS
-   fetched from the SAME ref (v0.4.1), not from main. If it does not match,
+   fetched from the SAME ref (v0.4.2), not from main. If it does not match,
    STOP and report it. Do not use --no-verify, and never run a file you have
    not verified.
 3. Ask me only for what you cannot infer: endpoint, model id, and the name of
    the environment variable holding the API key. Do not ask me for the key in
    clear.
 4. Run the installer with:
-       --ref v0.4.1
+       --ref v0.4.2
        --endpoint <endpoint>
        --api anthropic
        --model <model-id>
@@ -454,7 +454,7 @@ pi-conf.sh add \
 | `--input <lista>` | `text,image` | solo `text` e `image` (l'unione di pi). **Omesso = non toccare**: conserva l'`input` già presente |
 | `--from-file <json>` | — | riempie i campi mancanti |
 | `--config <path>` | config di pi | dove scrivere |
-| `--dry-run` | — | anteprima, non scrive |
+| `--dry-run` | — | anteprima del **risultato del merge**, non scrive |
 | `--print-config` | — | JSON risultante su stdout |
 | `--yes` | — | non chiede conferma |
 
@@ -562,7 +562,7 @@ Entrambi richiedono ovviamente `pi` installato e un `~/.pi/agent/` scrivibile.
 bash tests/pi-conf-test.sh
 ```
 
-**136 asserzioni in 15 sezioni** su `pi-conf.sh`, `install.sh` e
+**140 asserzioni in 16 sezioni** su `pi-conf.sh`, `install.sh` e
 `install-provider.sh`: merge non distruttivo, backup, mascheratura dell'anteprima,
 permessi del file, modalità non interattiva, `sanitize_name`, i due installer e
 una guardia che verifica che la suite non abbia mai toccato il
@@ -579,8 +579,9 @@ la guardia `has("apiKey")`, la preservazione di `input` nel merge, il default
 di `input` forzato incondizionatamente, la validazione di `--input`, la
 preservazione di `input` in PowerShell, il chiamato `Get-AddOptions -Args` in
 `pi-conf.ps1`, l'`input` forzato a `["text"]` in `pi-conf.ps1` e il
-`ConvertFrom-Json` su un ordered dictionary in `pi-conf.ps1`, la suite
-**fallisce** in tutti e dodici i casi.
+`ConvertFrom-Json` su un ordered dictionary in `pi-conf.ps1` e l'anteprima del
+dry-run che mostra il provider grezzo invece del risultato del merge, la suite
+**fallisce** in tutti e tredici i casi.
 
 Un sabotaggio ha rivelato un test che passava per il motivo sbagliato: il
 percorso interattivo scrive sempre un `input` **esplicito**, quindi non
@@ -622,7 +623,7 @@ arrivava mai al merge. Il test che ora lo copre passa da `add` senza
 
 <div align="center">
 
-**MIT** · [EULA v1.3](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.4.1`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
+**MIT** · [EULA v1.3](EULA.md) ([EN](EULA.en.md)) · rilascio [`v0.4.2`](https://github.com/ALF-Robotics/pi-configurator/releases) · [🌐 pagina di supporto](https://alf-robotics.github.io/pi-configurator/)
 
 <sub>🇮🇹 <b>Italiano</b> · 🇬🇧 <a href="README.en.md">English</a></sub>
 
